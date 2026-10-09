@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 .env
 models/ms-marco-MultiBERT-L-12
 models/cross-encoder-russian-msmarco/
@@ -663,3 +664,5 @@ MigrationBackup/
 .ionide/
 
 # End of https://www.toptal.com/developers/gitignore/api/vs,pycharm+all,python,macos
+
+data/*
