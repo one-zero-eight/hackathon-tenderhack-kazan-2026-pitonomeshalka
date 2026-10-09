@@ -1,0 +1,13 @@
+[project]
+name = "hackathon-tenderhack-kazan-2026-pitonomeshalka"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "openpyxl>=3.1.5",
+    "polars[xlsx]>=2.0.0",
+]
