@@ -47,6 +47,7 @@ class Settings:
     classifier_model: str = configured("CLASSIFIER_MODEL")
     classifier_timeout_seconds: float = configured("CLASSIFIER_TIMEOUT_SECONDS", float)
     classifier_health_timeout_seconds: float = configured("CLASSIFIER_HEALTH_TIMEOUT_SECONDS", float)
+    classifier_batch_size: int = configured("CLASSIFIER_BATCH_SIZE", int)
     catalog_path: Path = field(default_factory=lambda: env_path("KTRU_CATALOG_PATH"))
     xml_dir: Path = field(default_factory=lambda: env_path("KTRU_XML_DIR"))
     experiment_results_dir: Path = field(default_factory=lambda: env_path("EXPERIMENT_RESULTS_DIR"))
@@ -95,6 +96,8 @@ class Settings:
             raise ValueError("LOG_LEVEL must be critical, error, warning, info or debug")
         if not 1 <= self.top_k <= 32 or not 1 <= self.chunk_size <= 8:
             raise ValueError("PIPELINE_TOP_K must be 1–32 and PIPELINE_CHUNK_SIZE 1–8")
+        if not 0 <= self.classifier_batch_size <= 64:
+            raise ValueError("CLASSIFIER_BATCH_SIZE must be 0 (disabled) or 1–64")
         if not math.isfinite(self.threshold) or not 0 <= self.threshold <= 1:
             raise ValueError("PIPELINE_THRESHOLD must be finite and between 0 and 1")
         if not self.embedding_model.strip() or not self.classifier_model.strip() or not self.host.strip():

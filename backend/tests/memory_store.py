@@ -45,7 +45,7 @@ class MemoryStore:
         self.artifacts[run_id] = {}
 
     def save_plan(self, run_id, plan):
-        self.runs[run_id]["plan"] = deepcopy(plan["jobs"])
+        self.runs[run_id]["plan"] = deepcopy(plan["requests"])
 
     def save_artifact(self, run_id, name, payload):
         self.artifacts[run_id][name] = deepcopy(payload)

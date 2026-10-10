@@ -27,7 +27,7 @@ from experiments.embedding_retrieval import MeowEmbedClient, EmbeddingError
 class PostgresTests(unittest.TestCase):
     def setUp(self):
         self.directory = self.enterContext(tempfile.TemporaryDirectory())
-        self.settings = replace(Settings(), results_dir=Path(self.directory) / "runs",
+        self.settings = replace(Settings(), classifier_batch_size=0, results_dir=Path(self.directory) / "runs",
                                 catalog_path=Path(self.directory) / "catalog.json",
                                 embedding_cache_path=Path(self.directory) / "vectors.json",
                                 startup_log_path=Path(self.directory) / "startup.jsonl")
@@ -79,6 +79,7 @@ class PostgresTests(unittest.TestCase):
             reopened.initialize()
 
     def test_api_evidence_committed_before_dispatch_and_survives_restart(self):
+        self.settings = replace(self.settings, classifier_batch_size=16)
         model, embedder = FakeModel(), FakeEmbedder()
         original_infer = model.infer
 
@@ -101,7 +102,9 @@ class PostgresTests(unittest.TestCase):
         run = self.store.get_run(result["run_id"])
         self.assertEqual(run["status"], "completed")
         self.assertEqual(run["result"], result)
-        self.assertEqual(run["analysis"]["successful_requests"], 3)
+        self.assertEqual(run["analysis"]["successful_requests"], 1)
+        self.assertEqual(run["planned_requests"], 1)
+        self.assertEqual(len(run["plan"][0]["parts"]), 3)
         self.assertFalse(self.settings.results_dir.exists())
         self.assertFalse(self.settings.embedding_cache_path.exists())
         self.assertFalse(self.settings.startup_log_path.exists())

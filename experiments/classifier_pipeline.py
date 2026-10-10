@@ -93,11 +93,63 @@ def scalar_span(span, text):
     )
 
 
-def prepare(catalog, text, scope="all", top_k=8, chunk_size=4, max_questions=128, *, retrieval=None):
+def batch_jobs(jobs, batch_size):
+    """Pack independent jobs with the same input into bounded HTTP requests."""
+    if not 0 <= batch_size <= 64:
+        raise ValueError("Classifier batch size must be 0 (disabled) or 1–64")
+    if not batch_size:
+        return jobs
+    requests = []
+    for index, job in enumerate(jobs):
+        body = {key: value for key, value in job["body"].items() if key != "questions"}
+        questions = job["body"]["questions"]
+        if len(questions) > batch_size:
+            raise ValueError("A logical job exceeds the classifier batch size; reduce chunk_size")
+        if (not requests or body != {key: value for key, value in requests[-1]["body"].items() if key != "questions"}
+                or len(requests[-1]["body"]["questions"]) + len(questions) > batch_size):
+            requests.append({"id": f"batch_{len(requests)}", "experiment": "pipeline_batch",
+                             "body": dict(body, questions={}), "parts": []})
+        request = requests[-1]
+        # Numeric jobs reuse 'measurement'; namespace every ID before combining.
+        question_ids = {qid: f"j{index}__{qid}" for qid in questions}
+        request["body"]["questions"].update({question_ids[qid]: question for qid, question in questions.items()})
+        request["parts"].append({"job": job, "question_ids": question_ids})
+    return requests
+
+
+def unpack_records(records):
+    """Restore logical jobs from wire evidence, including failed/partial batches."""
+    result = []
+    for record in records:
+        if "parts" not in record:
+            result.append(record)
+            continue
+        for part in record["parts"]:
+            job = part["job"]
+            restored = {key: value for key, value in job.items() if key != "body"}
+            restored.update(request=job["body"], batch_request_id=record["id"])
+            if "error" in record:
+                restored["error"] = record["error"]
+            if "response" in record:
+                response = record["response"]
+                answers = {qid: response["answers"][wire_id] for qid, wire_id in part["question_ids"].items()
+                           if wire_id in response["answers"]}
+                if answers:
+                    restored["response"] = dict(response, answers=answers)
+                    if set(answers) != set(job["body"]["questions"]):
+                        restored["id"] += "_partial"
+            result.append(restored)
+    return result
+
+
+def prepare(catalog, text, scope="all", top_k=8, chunk_size=4, max_questions=128, *, retrieval=None, batch_size=0):
     # Explicit retrieval lets the backend/CLI use embeddings while historical
     # experiments and saved lexical runs remain reproducible offline.
     if retrieval is None:
         retrieval = retrieve(catalog, text, scope, top_k)
+    if not 0 <= batch_size <= 64:
+        raise ValueError("Classifier batch size must be 0 (disabled) or 1–64")
+    chunk_size = min(chunk_size, batch_size) if batch_size else chunk_size
     facts = sorted(ce.family_facts(catalog, retrieval["positions"]), key=lambda f: f["id"])
     jobs = []
     for name in sorted({p["name"] for p in retrieval["positions"]}):
@@ -137,7 +189,7 @@ def prepare(catalog, text, scope="all", top_k=8, chunk_size=4, max_questions=128
         raise ValueError(f"Shortlist requires {questions} questions, above --max-questions={max_questions}; reduce --top-k or inspect a narrower --scope")
     return {"text": text, "catalog_sha256": hashlib.sha256(json.dumps(catalog, ensure_ascii=False, sort_keys=True).encode()).hexdigest(),
             "retrieval": retrieval, "facts": facts, "spans": spans,
-            "jobs": jobs, "question_count": questions}
+            "jobs": jobs, "requests": batch_jobs(jobs, batch_size), "question_count": questions}
 
 
 def numeric_rule(value, entry):
@@ -166,6 +218,7 @@ def numeric_rule(value, entry):
 
 
 def analyze(plan, records, threshold=0.8, confirmed_extras=()):
+    records = unpack_records(records)
     facts = plan["facts"]
     answers = {qid: answer for r in records for qid, answer in r.get("response", {}).get("answers", {}).items() if qid in {f["id"] for f in facts}}
     extracted = [dict(f, status=answers[f["id"]]["choice"], probabilities=answers[f["id"]]["probabilities"],
@@ -307,7 +360,7 @@ def replay(plan, directories):
             if manifest.get("catalog_sha256") and manifest["catalog_sha256"] != plan["catalog_sha256"]:
                 raise ValueError(f"Catalog snapshot differs from saved run: {directory}")
         path = directory / "requests.jsonl"
-        saved.extend(json.loads(line) for line in path.read_text().splitlines() if line.strip())
+        saved.extend(unpack_records([json.loads(line) for line in path.read_text().splitlines() if line.strip()]))
     records = []
     for job in plan["jobs"]:
         answers = {}
@@ -338,6 +391,8 @@ def main():
     parser.add_argument("--scope", choices=("all", "drills", "tools", "clothing", "furniture"), default="all")
     parser.add_argument("--top-k", type=int, default=settings.top_k)
     parser.add_argument("--chunk-size", type=int, default=settings.chunk_size)
+    parser.add_argument("--classifier-batch-size", type=int, default=settings.classifier_batch_size,
+                        help="Questions per HTTP request (1–64); 0 reproduces unbatched jobs")
     parser.add_argument("--max-questions", type=int, default=settings.max_questions)
     parser.add_argument("--threshold", type=float, default=settings.threshold)
     parser.add_argument("--timeout", type=float, default=settings.classifier_timeout_seconds)
@@ -376,13 +431,13 @@ def main():
                                             args.embedding_cache, args.embedding_batch_size, args.embedding_max_names)
             retrieval = retriever.retrieve(catalog, args.text, args.scope, args.top_k)
         plan = prepare(catalog, args.text, args.scope, args.top_k, args.chunk_size, args.max_questions,
-                       retrieval=retrieval)
+                       retrieval=retrieval, batch_size=args.classifier_batch_size)
     except (ValueError, EmbeddingError) as error:
         parser.error(str(error))
     if args.dry_run:
-        print(json.dumps({"mode": "dry_run", "requests": len(plan["jobs"]), "questions": plan["question_count"],
+        print(json.dumps({"mode": "dry_run", "requests": len(plan["requests"]), "questions": plan["question_count"],
                           "analysis": analyze(plan, [], args.threshold, extras),
-                          "first_request": plan["jobs"][0]["body"] if plan["jobs"] else None}, ensure_ascii=False, indent=2))
+                          "first_request": plan["requests"][0]["body"] if plan["requests"] else None}, ensure_ascii=False, indent=2))
         return 0
     output = args.output or settings.experiment_results_dir / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_pipeline")
     if args.replay or not plan["jobs"]:
@@ -393,7 +448,7 @@ def main():
         output.mkdir(parents=True, exist_ok=False)
     else:
         try:
-            records, _ = ce.run_jobs(ce.ClassifierClient(args.base_url, args.timeout), plan["jobs"], output, catalog, args.threshold, args.scope)
+            records, _ = ce.run_jobs(ce.ClassifierClient(args.base_url, args.timeout), plan["requests"], output, catalog, args.threshold, args.scope)
         except (RuntimeError, ValueError) as error:
             print(str(error))
             return 1
@@ -401,7 +456,7 @@ def main():
     report.update(mode="replay" if args.replay else "live", replay_sources=[str(p) for p in args.replay],
                   catalog_sha256=hashlib.sha256(json.dumps(catalog, ensure_ascii=False, sort_keys=True).encode()).hexdigest())
     (output / "analysis.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
-    (output / "request_plan.json").write_text(json.dumps(plan["jobs"], ensure_ascii=False, indent=2) + "\n")
+    (output / "request_plan.json").write_text(json.dumps(plan["requests"], ensure_ascii=False, indent=2) + "\n")
     print(json.dumps({"status": report["status"], "mode": report["mode"], "complete_inference": report["complete_inference"],
                       "retrieved": len(report["candidates"]), "compatible": sum(c["compatible"] for c in report["candidates"]),
                       "provisional_candidate": report["provisional_candidate"], "final_code": report["final_code"],

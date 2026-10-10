@@ -103,6 +103,8 @@ The notes suggest an action space, where a model could choose actions repeatedly
 
 The current deployment reports `jiwo-4b` through `/health`. `CLASSIFIER_MODEL` in `.env` controls the expected model ID and the model field of inference requests. Earlier saved experiments used `bespokelabs/Bespoke-Nimble-9B-v3`; their recorded model IDs and results remain historical evidence. Your laptop sends text requests; the server performs model inference.
 
+The connected pipeline and backend pack product, categorical and numeric questions into HTTP batches using `CLASSIFIER_BATCH_SIZE` (default 16; 1–64, or 0 to disable). The pipeline CLI overrides this with `--classifier-batch-size`. `--chunk-size` still controls logical categorical groups, capped by the batch size. Actual requests use unique question IDs; saved `parts` map them to the original jobs so numeric checks and replay retain their meanings. Diagnostic suites keep their original request grouping for reproducible order/chunking comparisons. The installed jiwo server supports GPU batching within a request; submitting concurrent HTTP requests is unnecessary.
+
 **5. How a categorical fact is checked.**
 
 For every candidate fact, Python supplies four possible answers:
@@ -470,6 +472,7 @@ Useful options:
 | `--output` | New result directory to create |
 | `--top-k` | Pipeline's maximum retrieved positions; default 8 |
 | `--max-questions` | Pipeline's question budget; default 128 |
+| `--classifier-batch-size` | Pipeline questions per HTTP request; default 16, 1–64, or 0 to disable |
 | `--retrieval` | Pipeline retrieval mode; `embedding` by default, `lexical` for historical offline runs |
 | `--embedding-base-url` | meow-embed address; default from `EMBEDDING_BASE_URL` |
 | `--embedding-model` | Dense embedding model; default google/embeddinggemma-2 |

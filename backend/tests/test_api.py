@@ -66,9 +66,10 @@ class FakeModel:
             raise RuntimeError("inference timed out")
         answers = {}
         for qid, question in body["questions"].items():
+            logical_qid = qid.split("__", 1)[-1]
             choices = question["criteria"]
-            choice = "span_0" if qid == "measurement" else "contradicted" if qid == "mains" else "supported"
-            choice, confidence = self.overrides.get(qid, (choice, .95))
+            choice = "span_0" if logical_qid == "measurement" else "contradicted" if logical_qid == "mains" else "supported"
+            choice, confidence = self.overrides.get(logical_qid, (choice, .95))
             answers[qid] = dict(choice=choice, probabilities={
                 key: confidence if key == choice else (1 - confidence) / (len(choices) - 1) for key in choices
             })
@@ -103,7 +104,7 @@ class ApiTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.settings = Settings(results_dir=Path(self.directory.name) / "runs",
+        self.settings = Settings(classifier_batch_size=0, results_dir=Path(self.directory.name) / "runs",
                                  startup_log_path=Path(self.directory.name) / "startup.jsonl",
                                  embedding_cache_path=Path(self.directory.name) / "embeddings.json")
         self.store = MemoryStore()
@@ -241,6 +242,50 @@ class ApiTests(unittest.TestCase):
         self.assertNotIn("Model request:", stdout.getvalue())
         outgoing = [call["outgoing"]["request"] for call in self.store.calls[result["run_id"]]]
         self.assertEqual(outgoing, self.model.calls)
+
+    def test_batching_preserves_result_and_commits_one_complete_wire_request(self):
+        baseline = self.client.post("/analyze", json=self.body).json()
+        self.model.calls.clear()
+        service = self.app.state.pipeline
+        service.settings = replace(service.settings, classifier_batch_size=16)
+        self.assertEqual(self.client.post("/preview", json=self.body).json()["planned_requests"], 1)
+        infer = self.model.infer
+
+        def inspect_before_dispatch(body):
+            run_id = next(reversed(self.store.runs))
+            calls = self.store.calls[run_id]
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls[0]["outgoing"]["request"], body)
+            self.assertEqual(len(body["questions"]), 4)
+            return infer(body)
+
+        with patch.object(self.model, "infer", side_effect=inspect_before_dispatch):
+            response = self.client.post("/analyze", json=self.body)
+        self.assertEqual(response.status_code, 200, response.text)
+        batched = response.json()
+        self.assertEqual({k: v for k, v in baseline.items() if k != "run_id"},
+                         {k: v for k, v in batched.items() if k != "run_id"})
+        self.assertEqual(len(self.model.calls), 1)
+        details = self.store.runs[batched["run_id"]]["analysis"]
+        self.assertEqual(details["planned_requests"], 1)
+        self.assertEqual(details["successful_requests"], 1)
+        record = self.store.calls[batched["run_id"]][0]["record"]
+        self.assertEqual(len(record["parts"]), 3)
+        self.assertEqual(set(record["response"]["answers"]), set(self.model.calls[0]["questions"]))
+
+    def test_failed_batch_keeps_earlier_evidence_and_stops_dispatch(self):
+        self.app.state.pipeline.settings = replace(self.settings, classifier_batch_size=2)
+        self.model.fail_at = 2
+        response = self.client.post("/analyze", json=self.body)
+        self.assertEqual(response.status_code, 502)
+        result = response.json()["detail"]["result"]
+        self.assertFalse(result["complete_inference"])
+        self.assertEqual(len(self.model.calls), 2)
+        calls = self.store.calls[result["run_id"]]
+        self.assertIn("response", calls[0]["record"])
+        self.assertIn("error", calls[1]["record"])
+        self.assertEqual(len(calls[1]["record"]["parts"]), 1)
+        self.assertEqual(self.client.get("/results/" + result["run_id"]).json(), result)
 
     def test_missing_required_information_remains_visible(self):
         response = self.client.post("/analyze", json=dict(text="Аккумуляторная дрель", scope="drills"))

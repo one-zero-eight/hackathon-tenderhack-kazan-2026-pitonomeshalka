@@ -253,6 +253,84 @@ class FollowupTests(unittest.TestCase):
             self.assertEqual(report["supported_facts"]["evaluated"], 17)
 
 
+class BatchingTests(unittest.TestCase):
+    @staticmethod
+    def wire_records(plan, logical_records):
+        by_id = {record["id"]: record for record in logical_records}
+        records = []
+        for request in plan["requests"]:
+            answers = {}
+            for part in request["parts"]:
+                logical = by_id[part["job"]["id"]]
+                answers.update({wire_id: logical["response"]["answers"][qid]
+                                for qid, wire_id in part["question_ids"].items()})
+            records.append(dict({k: v for k, v in request.items() if k != "body"},
+                                request=request["body"], response={"model": ce.MODEL, "answers": answers}))
+        return records
+
+    def test_numeric_ids_do_not_collide_and_batched_analysis_matches_original(self):
+        catalog = catalog_fixture()
+        catalog["positions"][0]["characteristics"].append(dict(
+            code="motor", name="Напряжение двигателя", type="2", kind="2", required=True,
+            values=[dict(text="", unit_code="222", exact=["12"], ranges=[])]))
+        text = "Аккумуляторная дрель 18 В. Напряжение двигателя 12 В."
+        baseline = pipeline.prepare(catalog, text)
+        plan = pipeline.prepare(catalog, text, batch_size=8)
+        logical = answer_jobs(plan)
+        for record in logical:
+            if record.get("numeric_property", {}).get("name") == "Напряжение двигателя":
+                record["response"]["answers"]["measurement"] = distribution(
+                    "span_1", record["request"]["questions"]["measurement"]["criteria"])
+        records = self.wire_records(plan, logical)
+        self.assertEqual(len(plan["requests"]), 1)
+        self.assertEqual(len(records[0]["request"]["questions"]), 5)
+        self.assertEqual(pipeline.analyze(plan, records), pipeline.analyze(baseline, logical))
+        self.assertEqual(len(pipeline.analyze(plan, records)["numeric_bindings"]), 2)
+        restored = pipeline.unpack_records(records)
+        self.assertEqual([r["request"] for r in restored], [j["body"] for j in plan["jobs"]])
+
+    def test_limits_small_batches_and_distinct_inputs(self):
+        for size in (1, 2, 3, 4, 64):
+            with self.subTest(size=size):
+                plan = pipeline.prepare(catalog_fixture(), "Дрель 18 В", batch_size=size)
+                self.assertTrue(all(len(request["body"]["questions"]) <= size for request in plan["requests"]))
+                self.assertEqual(sum(len(request["body"]["questions"]) for request in plan["requests"]), plan["question_count"])
+        jobs = pipeline.prepare(catalog_fixture(), "Дрель 18 В")["jobs"]
+        self.assertIs(pipeline.batch_jobs(jobs, 0), jobs)
+        other = deepcopy(jobs[0])
+        other["body"]["state"] = "Другой товар"
+        self.assertEqual(len(pipeline.batch_jobs([jobs[0], other], 64)), 2)
+        other["body"]["state"] = jobs[0]["body"]["state"]
+        other["body"]["model"] = "another-model"
+        self.assertEqual(len(pipeline.batch_jobs([jobs[0], other], 64)), 2)
+        with self.assertRaises(ValueError):
+            pipeline.batch_jobs(jobs, 65)
+
+    def test_partial_or_failed_batch_never_claims_complete_inference(self):
+        plan = pipeline.prepare(catalog_fixture(), "Дрель 18 В", batch_size=8)
+        records = self.wire_records(plan, answer_jobs(plan))
+        categorical = next(part for part in records[0]["parts"] if part["job"]["experiment"] == "pipeline_facts")
+        del records[0]["response"]["answers"][next(iter(categorical["question_ids"].values()))]
+        self.assertFalse(pipeline.analyze(plan, records)["complete_inference"])
+        del records[0]["response"]
+        records[0]["error"] = "timeout"
+        restored = pipeline.unpack_records(records)
+        self.assertTrue(all(record["error"] == "timeout" and "response" not in record for record in restored))
+        self.assertEqual(pipeline.analyze(plan, records)["status"], "incomplete_inference")
+
+    def test_batch_evidence_replays_as_original_or_batched_plan(self):
+        plan = pipeline.prepare(catalog_fixture(), "Дрель 18 В", batch_size=8)
+        records = self.wire_records(plan, answer_jobs(plan))
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / "requests.jsonl").write_text("\n".join(json.dumps(r) for r in records))
+            original = pipeline.prepare(catalog_fixture(), "Дрель 18 В")
+            for target in (plan, original):
+                replayed = pipeline.replay(target, [directory])
+                self.assertTrue(pipeline.analyze(target, replayed)["complete_inference"])
+                self.assertEqual(pipeline.analyze(target, replayed), pipeline.analyze(plan, records))
+
+
 class ReplayTests(unittest.TestCase):
     def test_replay_requires_exact_input_questions_and_catalog_snapshot(self):
         plan = pipeline.prepare(catalog_fixture(), "Дрель 18 В.")

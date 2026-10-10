@@ -61,7 +61,8 @@ class PipelineService:
             retrieval = self.retriever.retrieve(self.catalog, request.text, request.scope, request.top_k)
             return pipeline.prepare(self.catalog, request.text, request.scope,
                                     request.top_k, request.chunk_size,
-                                    self.settings.max_questions, retrieval=retrieval)
+                                    self.settings.max_questions, retrieval=retrieval,
+                                    batch_size=self.settings.classifier_batch_size)
         except EmbeddingError as error:
             raise InferenceFailure("Embedding retrieval failed: " + str(error)) from error
         except ValueError as error:
@@ -71,7 +72,7 @@ class PipelineService:
     def preview(self, request: AnalysisRequest) -> PreviewResponse:
         plan = self.prepare(request)
         return PreviewResponse(
-            planned_requests=len(plan["jobs"]), planned_questions=plan["question_count"],
+            planned_requests=len(plan["requests"]), planned_questions=plan["question_count"],
             candidates=[CandidateReference(code=p["code"], version=p["version"], name=p["name"])
                         for p in plan["retrieval"]["positions"]],
         )
@@ -105,13 +106,13 @@ class PipelineService:
             self.store.save_catalog(self.catalog)
             self.store.save_plan(run_id, plan)
             logger.info("Analysis plan: run_id=%s requests=%d questions=%d", run_id,
-                        len(plan["jobs"]), plan["question_count"])
+                        len(plan["requests"]), plan["question_count"])
             records = []
             failure = None
             if plan["jobs"]:
                 client = self.client_factory(self.settings.classifier_base_url, self.settings.classifier_timeout_seconds)
                 try:
-                    records, _ = ce.run_jobs(client, plan["jobs"], None,
+                    records, _ = ce.run_jobs(client, plan["requests"], None,
                                             self.catalog, request.threshold, request.scope,
                                             evidence_store=self.store, run_id=run_id)
                 except (RuntimeError, ValueError) as error:
@@ -122,7 +123,7 @@ class PipelineService:
             result = analysis_response(report, run_id)
             details = dict(
                 mode="live", run_id=run_id, catalog_sha256=plan["catalog_sha256"],
-                planned_requests=len(plan["jobs"]), planned_questions=plan["question_count"],
+                planned_requests=len(plan["requests"]), planned_questions=plan["question_count"],
                 successful_requests=sum("response" in record for record in records), analysis=report,
             )
             self.store.finish_run(run_id, details, result.model_dump(mode="json", exclude_defaults=True), failure)

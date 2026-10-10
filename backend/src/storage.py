@@ -129,7 +129,7 @@ class PostgresStore:
     def save_plan(self, run_id, plan):
         with self.pool.connection() as conn:
             conn.execute("UPDATE analysis_runs SET catalog_sha256=%s, plan=%s, planned_requests=%s, planned_questions=%s WHERE id=%s",
-                         (plan["catalog_sha256"], Jsonb(plan["jobs"]), len(plan["jobs"]), plan["question_count"], run_id))
+                         (plan["catalog_sha256"], Jsonb(plan["requests"]), len(plan["requests"]), plan["question_count"], run_id))
 
     def save_artifact(self, run_id, name, payload):
         with self.pool.connection() as conn:

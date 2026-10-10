@@ -20,7 +20,8 @@ class ConfigurationTests(unittest.TestCase):
             settings = Settings()
             self.assertEqual(settings.classifier_base_url, "http://127.0.0.1:8769")
             self.assertEqual(settings.embedding_base_url, "http://127.0.0.1:8067")
-            self.assertEqual(settings.database_url, "postgresql://tenderhack:tenderhack-local@127.0.0.1:5432/tenderhack")
+            self.assertEqual(settings.database_url, "postgresql://tenderhack:tenderhack@127.0.0.1:5432/tenderhack")
+            self.assertEqual(settings.classifier_batch_size, 16)
             self.assertNotIn(settings.database_url, repr(settings))
             self.assertTrue(env("EMBEDDING_QUERY_PROMPT").endswith(" "))
             self.assertTrue(env("EMBEDDING_DOCUMENT_PROMPT").endswith(" "))
@@ -68,6 +69,8 @@ class ConfigurationTests(unittest.TestCase):
             ("CLASSIFIER_TIMEOUT_SECONDS", "nan"),
             ("STARTUP_CHECK_TIMEOUT_SECONDS", "0"),
             ("CLASSIFIER_HEALTH_TIMEOUT_SECONDS", "0"),
+            ("CLASSIFIER_BATCH_SIZE", "-1"),
+            ("CLASSIFIER_BATCH_SIZE", "65"),
             ("EMBEDDING_TIMEOUT_SECONDS", "0"),
             ("EMBEDDING_BATCH_SIZE", "0"),
             ("EMBEDDING_MAX_NAMES", "0"),
