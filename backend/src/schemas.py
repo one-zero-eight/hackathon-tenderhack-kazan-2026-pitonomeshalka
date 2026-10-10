@@ -50,11 +50,17 @@ class ExtraPropertyDecision(Property):
 
 
 class Candidate(CandidateReference):
-    status: Literal["supported", "uncertain", "rejected"]
+    status: Literal["compatible", "uncertain", "rejected"]
     reasons: list[str]
     missing_required: list[str] = Field(default_factory=list)
     unmatched_properties: list[str] = Field(default_factory=list)
     extra_characteristics: list[ExtraPropertyDecision] = Field(default_factory=list)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_legacy_status(cls, value):
+        # Saved results from before the rename must still be readable.
+        return "compatible" if value == "supported" else value
 
 
 class PreviewResponse(BaseModel):

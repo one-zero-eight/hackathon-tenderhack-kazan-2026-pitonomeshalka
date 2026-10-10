@@ -91,18 +91,20 @@ Read an analysis in this order:
 1. **`status`** tells you whether more input or a review is needed.
 2. **`recommended_candidate`** identifies a provisional candidate as `code@version`, or is `null` when evidence is insufficient. It is not a final validated code.
 3. **`properties`** lists accepted description facts and normalized measurements, such as battery power and `18 В`. Unstated optional properties are omitted. Ambiguous accepted values are withheld and explained in warnings.
-4. **`candidates`** is ordered with supported candidates first, then uncertain alternatives, then rejected candidates. Every decision has readable `reasons`.
-5. **`missing_required`** lists outstanding catalog-required properties for supported candidates. Uncertain and rejected alternatives omit this input checklist; their decisions and reasons remain visible. **`clarifying_question`** asks for the next useful detail.
+4. **`candidates`** is ordered with compatible candidates first, then uncertain alternatives, then rejected candidates. Every decision has readable `reasons`.
+5. **`missing_required`** lists outstanding catalog-required properties for compatible candidates. Uncertain and rejected alternatives omit this input checklist; their decisions and reasons remain visible. **`clarifying_question`** asks for the next useful detail.
 
 | Candidate `status` | Meaning |
 |---|---|
-| `supported` | Product identity is supported above the threshold; performed characteristic checks found no conflict or unresolved candidate rule. Missing required fields may still exist. |
+| `compatible` | Product identity is supported above the threshold; performed characteristic checks found no conflict or unresolved candidate rule. Missing required fields may still exist. |
 | `uncertain` | The candidate is not established as a match, but the evidence is insufficient to exclude it. |
 | `rejected` | An accepted value conflicts with its rules, a number is outside permitted values, or its product identity is confidently contradicted. |
 
 Optional empty candidate lists are omitted. `unmatched_properties` names interpreted properties absent from the candidate's schema; absence is not automatically a contradiction. `extra_characteristics` preserves caller-supplied fields and their actions: map and validate, do not add, review before adding, or policy unknown.
 
-Your saved drill example exposed two mechanical-drill alternatives whose rejection score was 0.749, below the 0.8 threshold. They now remain explicitly **uncertain**. The mains drill is **rejected** because it does not permit battery power. The battery drill is **supported**, becomes the provisional recommendation, and its missing requirements drive the next question. The system does not lower the threshold or pretend the mechanical alternatives have been conclusively excluded.
+Several candidates can be `compatible` at once; this produces `needs_clarification` without a recommendation. `compatible` means the checks performed passed, not that all required specifications are present or a final code has been validated. Model answers still use `supported` for individual facts and product identity. Older saved candidate statuses named `supported` are returned as `compatible` by `GET /results/{run_id}` without rewriting stored evidence.
+
+Your saved drill example exposed two mechanical-drill alternatives whose rejection score was 0.749, below the 0.8 threshold. They now remain explicitly **uncertain**. The mains drill is **rejected** because it does not permit battery power. The battery drill is **compatible**, becomes the provisional recommendation, and its missing requirements drive the next question. The system does not lower the threshold or pretend the mechanical alternatives have been conclusively excluded.
 
 Reprocessing that run produces these important fields:
 
@@ -126,7 +128,7 @@ This excerpt omits `run_id`, the candidate list, the next question and warnings.
 | Analysis `status` | What to do |
 |---|---|
 | `needs_clarification` | Answer the next question and resubmit the updated description. |
-| `ready_for_review` | Required fields of the supported candidate are covered; review applicability and evidence. No final code is issued. |
+| `ready_for_review` | Required fields of the compatible candidate are covered; review applicability and evidence. No final code is issued. |
 | `incomplete_inference` | Some scoring calls failed or are missing. Do not interpret absent answers as negative facts. |
 | `retrieval_miss` | The selected scope contains no candidates; review the catalog and scope. A nonempty semantic index returns nearest candidates even for unrelated input. |
 | `no_compatible_shortlist_candidate` | Review reported contradictions and search coverage. |

@@ -175,7 +175,7 @@ class ApiTests(unittest.TestCase):
         self.assertIsNone(result["clarifying_question"])
         self.assertIn({"name": "Напряжение аккумулятора", "value": "18 В"}, result["properties"])
         battery = result["candidates"][0]
-        self.assertEqual(battery["status"], "supported")
+        self.assertEqual(battery["status"], "compatible")
         self.assertEqual(battery["extra_characteristics"][0]["action"], "do_not_add")
         run_id = result["run_id"]
         self.assertEqual(self.store.runs[run_id]["result"], result)
@@ -467,6 +467,38 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(any("Analysis started: run_id=" + result["run_id"] in line for line in logs.output))
         self.assertTrue(any("Analysis saved: run_id=" + result["run_id"] in line for line in logs.output))
 
+    def test_saved_legacy_candidate_status_is_renamed_without_rerunning_models(self):
+        result = self.client.post("/analyze", json=self.body).json()
+        legacy = deepcopy(result)
+        battery = next(c for c in legacy["candidates"] if c["code"] == "battery")
+        battery["status"] = "supported"
+        self.store.runs[result["run_id"]]["result"] = legacy
+        model_calls, embedding_calls = len(self.model.calls), len(self.embedder.calls)
+
+        response = self.client.get("/results/" + result["run_id"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), result)
+        self.assertEqual(battery["status"], "supported")
+        self.assertEqual(len(self.model.calls), model_calls)
+        self.assertEqual(len(self.embedder.calls), embedding_calls)
+
+    def test_multiple_compatible_candidates_require_clarification(self):
+        alternative = deepcopy(self.catalog["positions"][0])
+        alternative.update(key="battery_alternative@1", code="battery_alternative")
+        self.app.state.pipeline.catalog["positions"].append(alternative)
+
+        response = self.client.post("/analyze", json=self.body)
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["status"], "needs_clarification")
+        self.assertIsNone(result["recommended_candidate"])
+        self.assertEqual([c["code"] for c in result["candidates"] if c["status"] == "compatible"],
+                         ["battery", "battery_alternative"])
+        facts = self.store.runs[result["run_id"]]["analysis"]["analysis"]["categorical_facts"]
+        self.assertEqual(next(f for f in facts if f["id"] == "battery")["status"], "supported")
+
     def test_saved_partial_result_can_be_recovered_after_model_failure(self):
         self.model.fail_at = 2
         original = self.client.post("/analyze", json=self.body)
@@ -495,9 +527,11 @@ class ApiTests(unittest.TestCase):
         responses = schema["paths"]["/analyze"]["post"]["responses"]
         self.assertTrue({"200", "422", "502", "503"} <= responses.keys())
         self.assertIn("AnalysisResponse", schema["components"]["schemas"])
+        self.assertEqual(schema["components"]["schemas"]["Candidate"]["properties"]["status"]["enum"],
+                         ["compatible", "uncertain", "rejected"])
         self.assertIn("PreviewResponse", schema["components"]["schemas"])
 
-    def test_weakly_rejected_alternative_does_not_hide_supported_candidate(self):
+    def test_weakly_rejected_alternative_does_not_hide_compatible_candidate(self):
         mechanical = deepcopy(self.catalog["positions"][0])
         mechanical.update(key="mechanical@1", code="mechanical", name="Дрель ручная механическая", characteristics=[])
         self.app.state.pipeline.catalog["positions"].append(mechanical)

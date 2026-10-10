@@ -45,21 +45,21 @@ def analysis_response(report: dict, run_id: str) -> AnalysisResponse:
         if candidate["uncertain"]:
             names = sorted({facts[fid]["name"] for fid in candidate["uncertain"]})
             reasons.append("Неоднозначные значения характеристик: " + ", ".join(names) + ".")
-        if candidate["assessment"] == "supported":
+        if candidate["assessment"] == "compatible":
             reasons.append("Вид товара подтверждён, выполненные проверки характеристик пройдены.")
         candidates.append(Candidate(
             code=candidate["code"], version=candidate["version"], name=candidate["name"],
             status=candidate["assessment"], reasons=reasons,
             missing_required=[field["name"] for field in candidate["missing_required"]]
-                             if candidate["assessment"] == "supported" else [],
+                             if candidate["assessment"] == "compatible" else [],
             unmatched_properties=sorted({facts[fid]["name"] for fid in candidate["extras"]}),
             extra_characteristics=[{key: extra[key] for key in ("name", "value", "action")}
                                    for extra in candidate["extra_characteristics"]],
         ))
-    priority = {"supported": 0, "uncertain": 1, "rejected": 2}
+    priority = {"compatible": 0, "uncertain": 1, "rejected": 2}
     candidates.sort(key=lambda candidate: (priority[candidate.status], candidate.code, candidate.version))
     recommended = next((f"{candidate.code}@{candidate.version}" for candidate in candidates
-                        if candidate.status == "supported" and candidate.code == report["provisional_candidate"]), None)
+                        if candidate.status == "compatible" and candidate.code == report["provisional_candidate"]), None)
     warnings = []
     if ambiguous:
         warnings.append("Противоречивые принятые значения требуют уточнения: " +

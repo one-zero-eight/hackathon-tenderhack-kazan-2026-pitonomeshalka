@@ -144,7 +144,7 @@ class ConstraintTests(unittest.TestCase):
         self.assertIsNone(report["provisional_candidate"])
         self.assertIn("вид самого товара", report["clarifying_question"])
 
-    def test_uncertain_product_alternative_does_not_block_supported_selection(self):
+    def test_uncertain_product_alternative_does_not_block_compatible_selection(self):
         mechanical = deepcopy(self.catalog["positions"][0])
         mechanical.update(key="mechanical@1", code="mechanical", name="Дрель ручная механическая", characteristics=[])
         self.catalog["positions"].append(mechanical)
@@ -160,7 +160,7 @@ class ConstraintTests(unittest.TestCase):
         self.assertEqual(alternative["assessment"], "uncertain")
         self.assertTrue(alternative["compatible"])
 
-    def test_complete_supported_candidate_moves_to_review(self):
+    def test_complete_compatible_candidate_moves_to_review(self):
         plan = pipeline.prepare(self.catalog, "Аккумуляторная дрель 18 В")
         report = pipeline.analyze(plan, answer_jobs(plan))
         self.assertEqual(report["status"], "ready_for_review")

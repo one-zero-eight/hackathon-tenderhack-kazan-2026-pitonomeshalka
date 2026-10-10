@@ -277,13 +277,13 @@ def analyze(plan, records, threshold=0.8, confirmed_extras=()):
             "rejected" if not candidate["compatible"] else
             "uncertain" if not candidate["object_supported"] or candidate["uncertain"]
             or any(check["status"] == "uncertain" for check in candidate["numeric_checks"]) else
-            "supported"
+            "compatible"
         )
         candidates.append(candidate)
     job_ids = {r["id"] for r in records if "response" in r}
     complete = all(j["id"] in job_ids for j in plan["jobs"])
     survivors = [c for c in candidates if c["compatible"]]
-    supported = [c for c in candidates if c["assessment"] == "supported"]
+    compatible_candidates = [c for c in candidates if c["assessment"] == "compatible"]
     conflicts = [f for f in extracted if f["status"] == "conflicting"]
     uncertain = [c for c in survivors if c["uncertain"]]
     object_uncertain = [c for c in survivors if not c["object_supported"]]
@@ -299,9 +299,9 @@ def analyze(plan, records, threshold=0.8, confirmed_extras=()):
     elif conflicts or unresolved or uncertain:
         status = "needs_clarification"
         question = "Уточните противоречивые характеристики перед исключением кандидатов."
-    elif supported:
-        status = "needs_clarification" if len(supported) > 1 or any(c["missing_required"] for c in supported) else "ready_for_review"
-        question = clarification(plan, supported, extracted) if status == "needs_clarification" else None
+    elif compatible_candidates:
+        status = "needs_clarification" if len(compatible_candidates) > 1 or any(c["missing_required"] for c in compatible_candidates) else "ready_for_review"
+        question = clarification(plan, compatible_candidates, extracted) if status == "needs_clarification" else None
     elif object_uncertain:
         status = "needs_clarification"
         question = "Уточните вид самого товара: выберите или уточните " + "; ".join(sorted({c["name"] for c in object_uncertain})) + "."
@@ -310,7 +310,7 @@ def analyze(plan, records, threshold=0.8, confirmed_extras=()):
         question = clarification(plan, survivors, extracted)
     return {
         "status": status, "final_code": None,
-        "provisional_candidate": supported[0]["code"] if len(supported) == 1 and complete and not (conflicts or unresolved or uncertain) else None,
+        "provisional_candidate": compatible_candidates[0]["code"] if len(compatible_candidates) == 1 and complete and not (conflicts or unresolved or uncertain) else None,
         "input": plan["text"], "retrieval": {k: v for k, v in plan["retrieval"].items() if k != "positions"},
         "complete_inference": complete, "threshold_uncalibrated": threshold,
         "categorical_facts": extracted, "numeric_bindings": [{"name": name, "okei": unit, "spans": spans} for (name, unit), spans in bindings.items()],
