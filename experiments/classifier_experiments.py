@@ -1,4 +1,4 @@
-"""Catalog experiments for the team's loopback Nimble System One API.
+"""Catalog experiments for the team's deployed classifier System One API.
 
 Standard-library client and data preparation; no model is loaded locally.
 Run --dry-run before forwarding localhost:8769. Live runs are opt-in.
@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import hashlib
 import json
+import logging
 import math
 from pathlib import Path
 import re
@@ -21,8 +22,14 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
-ROOT = Path(__file__).resolve().parents[1]
-MODEL = "bespokelabs/Bespoke-Nimble-9B-v3"
+if __package__:
+    from .config import ROOT, Settings, env, env_path
+else:
+    from config import ROOT, Settings, env, env_path
+
+MODEL = env("CLASSIFIER_MODEL")
+BASE_URL = env("CLASSIFIER_BASE_URL").rstrip("/")
+logger = logging.getLogger("uvicorn.error")
 NS = "{http://zakupki.gov.ru/oos/types/1}"
 STATUSES = {
     "supported": "Описание явно подтверждает факт, включая однозначные синонимы.",
@@ -36,6 +43,15 @@ def normalize(text):
     return " ".join(text.casefold().replace("ё", "е").split())
 
 
+def canonical_value(name, value):
+    """Explicit catalog aliases; do not infer equivalence from embedding scores."""
+    if normalize(name) == "тип питания" and normalize(value) in {
+        "от аккумулятора", "от аккумуляторных батарей", "от аккумуляторной батареи",
+    }:
+        return "От аккумулятора"
+    return value
+
+
 def identity(*parts):
     return hashlib.sha256(json.dumps(parts, ensure_ascii=False).encode()).hexdigest()[:20]
 
@@ -44,12 +60,13 @@ def xml_text(element, path):
     return element.findtext("/".join(NS + part for part in path.split("/")), "")
 
 
-def load_catalog(data_dir=ROOT / "data"):
+def load_catalog(data_dir=None):
     """Explicit exploratory domains; not a complete workbook-to-KTRU crosswalk.
 
     ACTIVE non-template records are retained with dates for review. No inferred
     lifecycle policy or fallback to a different parent version is applied.
     """
+    data_dir = data_dir if data_dir is not None else env_path("KTRU_XML_DIR")
     positions, facts = {}, {}
     paths = sorted(Path(data_dir).rglob("*all_actual*.xml"))
     if not paths:
@@ -155,10 +172,10 @@ def request_body(text, questions):
     return {"model": MODEL, "state": text, "questions": questions}
 
 
-class SystemOneClient:
-    def __init__(self, base_url="http://127.0.0.1:8769", timeout=180):
-        self.base_url = base_url.rstrip("/")
-        self.timeout = timeout
+class ClassifierClient:
+    def __init__(self, base_url=None, timeout=None):
+        self.base_url = (base_url if base_url is not None else env("CLASSIFIER_BASE_URL")).rstrip("/")
+        self.timeout = timeout if timeout is not None else float(env("CLASSIFIER_TIMEOUT_SECONDS"))
 
     def _json(self, path, body=None):
         payload = None if body is None else json.dumps(body, ensure_ascii=False).encode()
@@ -170,7 +187,7 @@ class SystemOneClient:
         except HTTPError as error:
             raise RuntimeError(f"HTTP {error.code}: {error.read().decode(errors='replace')}") from error
         except (URLError, TimeoutError) as error:
-            raise RuntimeError(f"API unavailable at {self.base_url}: {error}. Start the SSH tunnel; timed-out requests may still be running. No automatic retries.") from error
+            raise RuntimeError(f"API unavailable at {self.base_url}: {error}. Check the service connection; timed-out requests may still be running. No automatic retries.") from error
         return data, time.perf_counter() - start
 
     def health(self):
@@ -445,7 +462,8 @@ def narrow_candidates(positions, facts, records, threshold=0.8):
     grouped = defaultdict(list)
     for fact in supported:
         grouped[(normalize(fact["name"]), fact["unit_code"])].append(fact)
-    ambiguous = {key for key, vals in grouped.items() if len(vals) > 1}
+    ambiguous = {key for key, vals in grouped.items()
+                 if len({normalize(canonical_value(f["name"], f["value"])) for f in vals}) > 1}
     result = []
     for position in positions:
         matched, conflicts, extras, uncertain = [], [], [], []
@@ -458,10 +476,11 @@ def narrow_candidates(positions, facts, records, threshold=0.8):
             if key in ambiguous and any(c["kind"] != "3" for c in chars):
                 uncertain.append(fact["id"])
                 continue
-            allowed = {normalize(v["text"]) for c in chars for v in c["values"] if v["text"] and v["unit_code"] == key[1]}
+            allowed = {normalize(canonical_value(c["name"], v["text"])) for c in chars for v in c["values"]
+                       if v["text"] and v["unit_code"] == key[1]}
             if not allowed:
                 uncertain.append(fact["id"])
-            elif normalize(fact["value"]) in allowed:
+            elif normalize(canonical_value(fact["name"], fact["value"])) in allowed:
                 matched.append(fact["id"])
             else:
                 conflicts.append(fact["id"])
@@ -497,26 +516,37 @@ def summarize(records):
     return {"experiments": summary, "exact_value_baseline": dict(baseline, accuracy=baseline["correct"] / baseline["labeled"] if baseline["labeled"] else None), "confusion": [{"expected": a, "predicted": b, "count": n} for (a, b), n in sorted(confusion.items())]}
 
 
-def run_jobs(client, jobs, output_dir, catalog=None, threshold=0.8, scope="drills"):
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=False)
+def run_jobs(client, jobs, output_dir, catalog=None, threshold=0.8, scope="drills", *, evidence_store=None, run_id=None):
+    # Experiments retain file export; the backend commits evidence to PostgreSQL.
+    from contextlib import ExitStack
+    if evidence_store is None:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=False)
+    elif run_id is None:
+        raise ValueError("Database evidence requires a run ID")
+
+    def artifact(name, payload):
+        if evidence_store is not None:
+            evidence_store.save_artifact(run_id, name, payload)
+        else:
+            (output_dir / name).write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     try:
         health = client.health()
     except (RuntimeError, ValueError) as error:
-        (output_dir / "startup_error.json").write_text(json.dumps({"error": str(error), "base_url": client.base_url}, indent=2) + "\n")
+        artifact("startup_error.json", {"error": str(error), "base_url": client.base_url})
         raise
-    (output_dir / "health.json").write_text(json.dumps(health, ensure_ascii=False, indent=2) + "\n")
+    artifact("health.json", health)
     manifest = {"model": MODEL, "base_url": client.base_url, "timeout": client.timeout, "scope": scope, "threshold_uncalibrated": threshold, "planned_requests": len(jobs), "diagnostic_not_held_out": True}
     if catalog:
         manifest["catalog_sha256"] = hashlib.sha256(json.dumps(catalog, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-    (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    artifact("manifest.json", manifest)
     records = []
-    with (
-        (output_dir / "requests.jsonl").open("w", encoding="utf-8") as log,
-        (output_dir / "model_requests.jsonl").open("w", encoding="utf-8") as request_log,
-    ):
+    with ExitStack() as stack:
+        log = request_log = None
+        if evidence_store is None:
+            log = stack.enter_context((output_dir / "requests.jsonl").open("w", encoding="utf-8"))
+            request_log = stack.enter_context((output_dir / "model_requests.jsonl").open("w", encoding="utf-8"))
         for index, job in enumerate(jobs):
-            print(f"{index + 1}/{len(jobs)} {job['experiment']} {job['id']}", flush=True)
             record = {k: v for k, v in job.items() if k != "body"}
             # Save before dispatch so in-flight and interrupted calls remain inspectable.
             outgoing = {
@@ -526,9 +556,15 @@ def run_jobs(client, jobs, output_dir, catalog=None, threshold=0.8, scope="drill
                 "request": job["body"],
             }
             serialized = json.dumps(outgoing, ensure_ascii=False)
-            request_log.write(serialized + "\n")
-            request_log.flush()
-            print("Model request: " + serialized, flush=True)
+            if evidence_store is not None:
+                evidence_store.start_model_call(run_id, index, outgoing)
+            else:
+                request_log.write(serialized + "\n")
+                request_log.flush()
+            logger.info("Model request: %d/%d run_id=%s id=%s experiment=%s questions=%d",
+                        index + 1, len(jobs), run_id or "experiment", job["id"], job["experiment"],
+                        len(job["body"]["questions"]))
+            logger.debug("Model request payload: %s", serialized)
             try:
                 record.update(client.infer(job["body"]))
                 if "spans" in job:
@@ -537,8 +573,11 @@ def run_jobs(client, jobs, output_dir, catalog=None, threshold=0.8, scope="drill
             except (RuntimeError, ValueError) as error:
                 record.update(request=job["body"], error=str(error))
             records.append(record)
-            log.write(json.dumps(record, ensure_ascii=False) + "\n")
-            log.flush()
+            if evidence_store is not None:
+                evidence_store.finish_model_call(run_id, index, record)
+            else:
+                log.write(json.dumps(record, ensure_ascii=False) + "\n")
+                log.flush()
             if "error" in record:
                 break  # A timed-out shared-GPU call might still be running.
     summary = summarize(records)
@@ -565,9 +604,9 @@ def run_jobs(client, jobs, output_dir, catalog=None, threshold=0.8, scope="drill
                 "complete_fact_scan": {f["id"] for f in facts} <= answered,
                 "candidates": narrow_candidates(positions, facts, group, threshold),
             }
-    (output_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
+    artifact("summary.json", summary)
     if any(j["experiment"] == "fact_followup" for j in jobs):
-        (output_dir / "followup_report.json").write_text(json.dumps(followup_report(records, jobs, threshold), ensure_ascii=False, indent=2) + "\n")
+        artifact("followup_report.json", followup_report(records, jobs, threshold))
     return records, summary
 
 
@@ -585,16 +624,18 @@ def build_jobs(catalog, suite="smoke", text="Нужна аккумуляторн
 
 
 def main():
+    settings = Settings.from_environment()
+    logging.basicConfig(level=settings.log_level.upper())
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--suite", choices=("smoke", "numeric", "followup", "order", "facts", "slots", "progressive"), default="smoke")
-    parser.add_argument("--base-url", default="http://127.0.0.1:8769")
-    parser.add_argument("--timeout", type=float, default=180)
+    parser.add_argument("--base-url", default=settings.classifier_base_url)
+    parser.add_argument("--timeout", type=float, default=settings.classifier_timeout_seconds)
     parser.add_argument("--text", default="Нужна аккумуляторная дрель 18 В с реверсом, без ударного режима.")
-    parser.add_argument("--chunk-size", type=int, default=4)
+    parser.add_argument("--chunk-size", type=int, default=settings.chunk_size)
     parser.add_argument("--scope", choices=("drills", "clothing", "furniture", "tools", "all"), default="drills", help="catalog scope for facts/slots; progressive always uses the drill family")
-    parser.add_argument("--threshold", type=float, default=0.8)
+    parser.add_argument("--threshold", type=float, default=settings.threshold)
     parser.add_argument("--dry-run", action="store_true", help="prepare requests without any network calls")
-    parser.add_argument("--catalog-cache", type=Path, default=ROOT / "experiments/results/nimble_catalog.json")
+    parser.add_argument("--catalog-cache", type=Path, default=settings.catalog_path)
     parser.add_argument("--rebuild-catalog", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -605,7 +646,7 @@ def main():
         if args.catalog_cache.exists() and not args.rebuild_catalog:
             catalog = json.loads(args.catalog_cache.read_text())
         else:
-            catalog = load_catalog()
+            catalog = load_catalog(settings.xml_dir)
             args.catalog_cache.parent.mkdir(parents=True, exist_ok=True)
             args.catalog_cache.write_text(json.dumps(catalog, ensure_ascii=False) + "\n")
         if len(drill_family(catalog)) < 2:
@@ -614,8 +655,8 @@ def main():
     if args.dry_run:
         print(json.dumps({"suite": args.suite, "requests": len(jobs), "questions": sum(len(j['body']['questions']) for j in jobs), "first_request": jobs[0]["body"], "catalog_positions": len(catalog["positions"]) if catalog else None}, ensure_ascii=False, indent=2))
         return 0
-    output = args.output or ROOT / "experiments/results" / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + args.suite)
-    _, summary = run_jobs(SystemOneClient(args.base_url, args.timeout), jobs, output, catalog, args.threshold, args.scope)
+    output = args.output or settings.experiment_results_dir / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + args.suite)
+    _, summary = run_jobs(ClassifierClient(args.base_url, args.timeout), jobs, output, catalog, args.threshold, args.scope)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print("Results:", output)
     return int(any(v["errors"] for v in summary["experiments"].values()))

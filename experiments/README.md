@@ -1,8 +1,8 @@
-This directory contains Python experiments for turning a product description into explained КТРУ candidates. Start with the idea, then use the commands below. The scripts run on your laptop and call the team's existing Nimble model on the server. You do not need to load model weights or use a notebook.
+This directory contains Python experiments for turning a product description into explained КТРУ candidates. Start with the idea, then use the commands below. The scripts run on your laptop and call the team's existing classifier model on the server. You do not need to load model weights or use a notebook.
 
-The two entry points are [nimble_experiments.py](nimble_experiments.py), which tests individual parts of the idea, and [nimble_pipeline.py](nimble_pipeline.py), which connects those parts. [results-analysis.md](results-analysis.md) reviews the saved model runs. [pipeline-explanation.md](pipeline-explanation.md) explains implementation choices in more detail. The original proposal is in [data/notes.md](../data/notes.md).
+The two entry points are [classifier_experiments.py](classifier_experiments.py), which tests individual parts of the idea, and [classifier_pipeline.py](classifier_pipeline.py), which connects those parts. [results-analysis.md](results-analysis.md) reviews the saved model runs. [pipeline-explanation.md](pipeline-explanation.md) explains implementation choices in more detail. The original proposal is in [data/notes.md](../data/notes.md).
 
-The same connected pipeline is available through the [FastAPI backend](../backend/README.md). Run `uv run --locked -m backend.src` from the repository root, then open `http://127.0.0.1:8000/docs`. `/preview` prepares a plan without the model; `/analyze` runs it and returns the complete explanation report.
+The same connected pipeline is available through the [FastAPI backend](../backend/README.md). On first setup, copy [.example.env](../.example.env) to `.env` and configure your service addresses. Both entry points automatically load the repository-root `.env` with `python-dotenv`; exported variables win, and command-line flags override the configured defaults. The template contains localhost addresses, model IDs, timeouts, paths, embedding prefixes, batch size and pipeline defaults. The actual `.env` is ignored by Git. Run `uv run --locked -m backend.src` from the repository root, then open `http://127.0.0.1:8000/docs`. `/preview` searches using the configured embedder and prepares a plan without calling the classifier; `/analyze` uses the configured classifier service and returns the complete explanation report.
 
 **1. Start with the problem.**
 
@@ -72,26 +72,26 @@ The importer retains characteristic rules and their source locations. It also pr
 
 A fact appearing in several positions is stored once with references back to each source. The deduplication key uses normalized characteristic name, value and unit code. Normalization here means lowercase, whitespace cleanup and ё → е. It does not prove that similarly named properties in different product contexts mean the same thing.
 
-The suite runner saves the prepared catalog to `results/nimble_catalog.json` and reuses it. After changing source data, rebuild it with:
+The suite runner saves the prepared catalog to `results/catalog.json` and reuses it. After changing source data, rebuild it with:
 
 ```bash
-uv run --locked python experiments/nimble_experiments.py \
+uv run --locked python experiments/classifier_experiments.py \
   --suite facts --rebuild-catalog --dry-run
 ```
 
 The pipeline uses that cache if present. Without it, it imports the catalog for the current invocation. It does not write a new cache itself.
 
-**4. What Python does and what Nimble does.**
+**4. What Python does and what the classifier does.**
 
 Python reads the catalog, finds possible positions, constructs questions, parses numbers, converts units, checks numeric limits and writes the results.
 
-Nimble judges the meaning of the description against choices Python supplies. For example: “Does this description support battery power?” or “Which of these numbers belongs to the battery?”
+The classifier judges the meaning of the description against choices Python supplies. For example: “Does this description support battery power?” or “Which of these numbers belongs to the battery?”
 
 ```mermaid
 flowchart LR
     T["User description"] --> P["Python prepares candidates and questions"]
     C["Catalog rules"] --> P
-    P --> M["Remote Nimble scores the supplied choices"]
+    P --> M["Remote classifier scores the supplied choices"]
     M --> S["Python collects answers and checks rules"]
     C --> S
     S --> R["Explained candidates, missing fields and next question"]
@@ -101,7 +101,7 @@ The current model API is a choice-scoring service. These scripts do not ask it t
 
 The notes suggest an action space, where a model could choose actions repeatedly. A choice can name an action, but application code would still have to execute that action, keep state and prepare the next choices. The current client does not implement that loop or arbitrary tool arguments. Catalog facts and input number spans already provide choices for this experiment.
 
-The deployment reports `bespokelabs/Bespoke-Nimble-9B-v3`, NF4 weights and FP16 computation on the shared V100. In plain terms, the stored weights use a compact representation and the computation uses half precision. Your laptop sends text requests; the server performs model inference, meaning model evaluation for those requests.
+The current deployment reports `jiwo-4b` through `/health`. `CLASSIFIER_MODEL` in `.env` controls the expected model ID and the model field of inference requests. Earlier saved experiments used `bespokelabs/Bespoke-Nimble-9B-v3`; their recorded model IDs and results remain historical evidence. Your laptop sends text requests; the server performs model inference.
 
 **5. How a categorical fact is checked.**
 
@@ -128,7 +128,7 @@ Here is an illustrative valid choice request. The criterion wording is shortened
 
 ```json
 {
-  "model": "bespokelabs/Bespoke-Nimble-9B-v3",
+  "model": "jiwo-4b",
   "state": "Нужна аккумуляторная дрель.",
   "questions": {
     "power": {
@@ -149,7 +149,7 @@ The server returns a selected choice and a probability for each supplied choice.
 
 ```json
 {
-  "model": "bespokelabs/Bespoke-Nimble-9B-v3",
+  "model": "jiwo-4b",
   "answers": {
     "power": {
       "type": "choice",
@@ -202,7 +202,7 @@ Python finds two **spans**, meaning exact pieces of the original text with start
 | 18 В | 18 V | Drill battery |
 | 220 В | 220 V | Charger input |
 
-Matching units is not enough to decide ownership. Both numbers are voltages. Nimble chooses the span that describes the requested property, or returns unknown/conflicting. Python then uses the selected normalized value.
+Matching units is not enough to decide ownership. Both numbers are voltages. The classifier chooses the span that describes the requested property, or returns unknown/conflicting. Python then uses the selected normalized value.
 
 For `0,018 кВ`, Python replaces the decimal comma for parsing and multiplies by 1,000: the normalized value is `18.000` V, numerically equal to 18 V. The current numeric suite still fails to select that span, even though Python's conversion succeeds.
 
@@ -224,17 +224,15 @@ The pipeline does not treat signed values, bounds or detected range endpoints as
 
 **8. What the connected pipeline does, step by step.**
 
-Run [nimble_pipeline.py](nimble_pipeline.py) when you want to follow one description through the combined process.
+Run [classifier_pipeline.py](classifier_pipeline.py) when you want to follow one description through the combined process.
 
-First it searches position names using the leading product phrase. For the sample, that phrase is “Нужна аккумуляторная дрель 18 В.” It stops before phrases introduced by words such as “с,” “без,” “из” or “для,” and before semicolons or pipe separators.
+The backend and pipeline CLI default to embedding retrieval through the meow-embed service configured in `.env`. The example configuration uses `google/embeddinggemma-2`. The 283 distinct normalized names in the 1,302-position snapshot are embedded in batches and cached; the full description is embedded with the query prompt. Cosine similarity selects up to four nearest names within the scope, and their code/version alternatives are interleaved up to `top_k` (eight in the example configuration). No shared words or similarity acceptance threshold are required. `retrieval.truncated=true` means catalog positions were left outside the shortlist; it does not establish recall.
 
-That boundary is a practical heuristic. Searching every word originally let “без ударного режима” bring “Клеймо ударное” above drills. Product-name search must avoid mistaking an attribute or accessory for the requested object.
+The original word-based search remains available only as the explicit CLI baseline `--retrieval lexical` and for historical offline experiment preparation. It uses a leading product phrase, simple suffix stripping and shared-word ranking. Use this mode when replaying older lexical runs. Embedding retrieval requires the service even for `--dry-run` and `--replay`; a dry run can build the vector cache but does not call the classifier.
 
-The search gives more weight to less common shared words and balances that against name length. It also interleaves different position names so many versions of one name do not occupy the entire shortlist. This is a simple word-based baseline; unusual wording, synonyms and typos can still make it miss relevant positions.
+CLI embedding settings are `--embedding-base-url`, `--embedding-model`, `--embedding-cache`, `--embedding-timeout`, `--embedding-batch-size` and `--embedding-max-names`. The service/model defaults match the backend. Standalone experiments continue to export files; the backend stores its catalog, vectors, runs and request logs in PostgreSQL with pgvector. The backend's environment settings and persistence are documented in [backend/README.md](../backend/README.md).
 
-By default, it searches the 1,302-position snapshot and keeps at most eight candidates. `retrieval.truncated=true` means some lexical matches were left out. Even when false, it only means all word-matching results fit; it does not prove perfect semantic coverage.
-
-Next it asks Nimble whether each distinct candidate name describes the actual product. For example, mechanical and electric drills can both match the word “дрель,” but battery-powered text should help distinguish them. A candidate name clearly contradicted above the threshold is excluded; an unsupported/uncertain name cannot produce a provisional selection.
+Next it asks the classifier whether each distinct candidate name describes the actual product. For example, mechanical and electric drills can both match the word “дрель,” but battery-powered text should help distinguish them. A candidate name clearly contradicted above the threshold is excluded; an unsupported/uncertain name cannot produce a provisional selection.
 
 Then it collects the categorical facts associated with those candidates and scores them independently. It also parses numerical spans and asks ownership questions for candidate numerical properties with supported matching units.
 
@@ -283,7 +281,7 @@ An **unbound measurement** is a number found in the raw description whose proper
 A **user-supplied extra** is an explicit field added through a command such as:
 
 ```bash
-uv run --locked python experiments/nimble_pipeline.py \
+uv run --locked python experiments/classifier_pipeline.py \
   --text 'Нужна аккумуляторная дрель 18 В.' \
   --extra 'Цвет=Синий' --dry-run
 ```
@@ -350,13 +348,13 @@ To compare chunking with ordinary Python scripts, keep text/scope fixed and run 
 
 **13. Three kinds of “test” establish different things.**
 
-| What you run | Contacts the model? | What it establishes |
+| What you run | Contacts the classifier? | What it establishes |
 |---|---|---|
 | Offline unit tests | No; API behavior is simulated where needed | Python control flow, conversions, boundaries, unknown/conflict handling and saved-file behavior |
-| `--dry-run` | No | Which requests would be sent and whether preparation succeeds |
+| `--dry-run` | No; the embedding pipeline still contacts meow-embed | Which requests would be sent and whether preparation succeeds |
 | A live suite/pipeline command | Yes, when it has planned questions | What the deployed model actually returns on those inputs |
 
-A passing unit test cannot prove Nimble understands a description. A successful dry run cannot prove extraction accuracy. A successful `/health` response confirms server/configuration reachability, but a model-scoring request must still succeed.
+A passing unit test cannot prove the classifier understands a description. A successful dry run cannot prove extraction accuracy. A successful `/health` response confirms server/configuration reachability, but a model-scoring request must still succeed.
 
 The labeled examples are manually written development cases. Real STE descriptions from the source audit lack verified КТРУ labels. They are useful for inspection but do not yet form a final-code benchmark.
 
@@ -367,21 +365,21 @@ Run commands from the repository root. `uv run --locked` uses the project's depe
 Check the Python implementation:
 
 ```bash
-uv run --locked python -m unittest discover -s experiments -p 'test_nimble*.py' -v
+uv run --locked python -m unittest discover -s experiments -p 'test_*.py' -v
 ```
 
 Prepare suite requests without model calls:
 
 ```bash
-uv run --locked python experiments/nimble_experiments.py --suite smoke --dry-run
-uv run --locked python experiments/nimble_experiments.py --suite facts --dry-run
-uv run --locked python experiments/nimble_experiments.py --suite followup --dry-run
+uv run --locked python experiments/classifier_experiments.py --suite smoke --dry-run
+uv run --locked python experiments/classifier_experiments.py --suite facts --dry-run
+uv run --locked python experiments/classifier_experiments.py --suite followup --dry-run
 ```
 
 Prepare a connected pipeline request plan:
 
 ```bash
-uv run --locked python experiments/nimble_pipeline.py \
+uv run --locked python experiments/classifier_pipeline.py \
   --text 'Нужна аккумуляторная дрель 18 В с реверсом, без ударного режима.' \
   --dry-run
 ```
@@ -394,7 +392,9 @@ A dry run prints its plan to the terminal. It does not create a live inference r
 
 The team's server listens on its own loopback address, port 8769. Your laptop's `127.0.0.1` refers to your laptop, not that server. An SSH tunnel connects the two.
 
-In one laptop terminal, start this tunnel and keep it running:
+Set `CLASSIFIER_BASE_URL` in `.env` to the service address, including its reverse-proxy path when applicable. For an HTTPS deployment, check its `/health` endpoint directly. The localhost address in `.example.env` is intended for a local service or tunnel.
+
+For a deployment that is available only on the compute server's loopback address, start this optional tunnel in one terminal and keep it running. Select it with `--base-url http://127.0.0.1:8769` or `CLASSIFIER_BASE_URL=http://127.0.0.1:8769` for the backend:
 
 ```bash
 ssh -N -o ExitOnForwardFailure=yes \
@@ -420,13 +420,13 @@ Closing the laptop tunnel closes forwarding; it does not stop the remote model. 
 These commands intentionally omit `--dry-run`:
 
 ```bash
-uv run --locked python experiments/nimble_experiments.py --suite smoke
-uv run --locked python experiments/nimble_experiments.py --suite numeric
-uv run --locked python experiments/nimble_experiments.py --suite followup
-uv run --locked python experiments/nimble_experiments.py --suite slots
-uv run --locked python experiments/nimble_experiments.py --suite facts
-uv run --locked python experiments/nimble_experiments.py --suite progressive
-uv run --locked python experiments/nimble_experiments.py --suite order
+uv run --locked python experiments/classifier_experiments.py --suite smoke
+uv run --locked python experiments/classifier_experiments.py --suite numeric
+uv run --locked python experiments/classifier_experiments.py --suite followup
+uv run --locked python experiments/classifier_experiments.py --suite slots
+uv run --locked python experiments/classifier_experiments.py --suite facts
+uv run --locked python experiments/classifier_experiments.py --suite progressive
+uv run --locked python experiments/classifier_experiments.py --suite order
 ```
 
 Each command creates its own result directory. Run them sequentially against the shared service. The follow-up command must omit `--dry-run` if you want actual normalized-number results.
@@ -434,24 +434,24 @@ Each command creates its own result directory. Run them sequentially against the
 To run the combined pipeline:
 
 ```bash
-uv run --locked python experiments/nimble_pipeline.py \
+uv run --locked python experiments/classifier_pipeline.py \
   --text 'Нужна аккумуляторная дрель 18 В с реверсом, без ударного режима.'
 ```
 
 To change a fact-scan input:
 
 ```bash
-uv run --locked python experiments/nimble_experiments.py --suite facts \
+uv run --locked python experiments/classifier_experiments.py --suite facts \
   --text 'Аккумуляторная дрель с реверсом, без ударного режима.'
 ```
 
 To inspect a different vocabulary before submitting it:
 
 ```bash
-uv run --locked python experiments/nimble_experiments.py --suite facts \
+uv run --locked python experiments/classifier_experiments.py --suite facts \
   --scope furniture --text 'Нужен стул без подлокотников.' --dry-run
 
-uv run --locked python experiments/nimble_experiments.py --suite facts \
+uv run --locked python experiments/classifier_experiments.py --suite facts \
   --scope all --dry-run
 ```
 
@@ -464,14 +464,20 @@ Useful options:
 | `--scope` | Catalog subset; defaults to drills for facts/slots and all for the pipeline |
 | `--chunk-size` | Fact questions per HTTP request; default 4 |
 | `--threshold` | Experimental supported/binding acceptance cutoff; default 0.8 |
-| `--base-url` | Address reached through the tunnel; default http://127.0.0.1:8769 |
+| `--base-url` | classifier service address; default from `CLASSIFIER_BASE_URL` |
 | `--timeout` | Maximum wait per HTTP call; default 180 seconds |
 | `--catalog-cache` | Prepared catalog file to load |
 | `--output` | New result directory to create |
 | `--top-k` | Pipeline's maximum retrieved positions; default 8 |
 | `--max-questions` | Pipeline's question budget; default 128 |
+| `--retrieval` | Pipeline retrieval mode; `embedding` by default, `lexical` for historical offline runs |
+| `--embedding-base-url` | meow-embed address; default from `EMBEDDING_BASE_URL` |
+| `--embedding-model` | Dense embedding model; default google/embeddinggemma-2 |
+| `--embedding-cache` | Persistent catalog vectors; default backend/cache/catalog_embeddings.json |
+| `--embedding-timeout` | Maximum wait per embedding request; default 60 seconds |
+| `--embedding-batch-size` | Catalog names per embedding request; default 32 |
 | `--extra NAME=VALUE` | Pipeline's explicit user property to preserve/review |
-| `--replay` | Pipeline's saved-run input instead of fresh model calls |
+| `--replay` | Pipeline's saved-run input instead of fresh classifier calls; use `--retrieval lexical` for older lexical runs |
 
 Output directories must be new. Existing results are not overwritten.
 
@@ -484,6 +490,7 @@ Live runs normally create `experiments/results/<UTC timestamp>_<suite>/`. The ti
 | `health.json` | Model/configuration reported before scoring |
 | `manifest.json` | Endpoint, timeout, scope, threshold, planned requests and catalog hash when used |
 | `requests.jsonl` | Each saved request, answer, timing, metadata and expected labels when present |
+| `model_requests.jsonl` | Complete outgoing inference payloads, timestamps and URLs, flushed before dispatch |
 | `summary.json` | Counts, label accuracy, confusion, latency and suite-specific checks |
 | `startup_error.json` | Health/model validation failed before scoring; normal run files may be absent |
 | `followup_report.json` | Follow-up numeric A/B pairs, per-domain results and supported-fact metrics |
@@ -491,6 +498,8 @@ Live runs normally create `experiments/results/<UTC timestamp>_<suite>/`. The ti
 | `request_plan.json` | Pipeline questions prepared for the input |
 
 JSONL means one JSON object per line. The runner flushes each record to disk, which lets a partial log retain useful completed answers even when the command does not finish.
+
+Console logging at `LOG_LEVEL=info` shows request progress, IDs, experiment and question count. Use `LOG_LEVEL=debug` for full outgoing JSON. File evidence remains complete at both levels.
 
 Start with the summary or pipeline analysis. Open the raw record whenever you need to understand a surprising result: inspect the original description, exact question, selected answer, all scores and expected label. A summary cannot show every detail.
 
@@ -554,7 +563,7 @@ Replay is useful for inspecting how already saved predictions affect the current
 This command uses one existing categorical run:
 
 ```bash
-uv run --locked python experiments/nimble_pipeline.py \
+uv run --locked python experiments/classifier_pipeline.py \
   --text 'Нужна аккумуляторная дрель 18 В с реверсом, без ударного режима.' \
   --scope drills \
   --replay experiments/results/20261010T104755904454Z_facts
@@ -587,4 +596,4 @@ There are also three partial inference logs, one startup error, one health-only 
 
 As of that review, no saved live follow-up or connected pipeline result exists. The next measurements are normalized-number A/B, clearer conflicts/corrections, and the pipeline's product-name/numeric-binding questions. After those diagnostics, use independently reviewed real descriptions to measure retrieval recall, supported facts, missing-field behavior and final-code correctness. The current results establish a useful experiment, not a completed production selector.
 
-The notebook [nimble_systemone.ipynb](nimble_systemone.ipynb) remains available for interactive inspection. The Python commands above provide the regular-script workflow.
+The notebook [classifier_systemone.ipynb](classifier_systemone.ipynb) remains available for interactive inspection. The Python commands above provide the regular-script workflow.

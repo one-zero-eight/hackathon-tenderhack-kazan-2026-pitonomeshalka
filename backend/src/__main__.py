@@ -4,12 +4,16 @@ import sys
 
 import uvicorn
 
+from backend.src.settings import Settings
+
 
 def main() -> None:
+    settings = Settings.from_environment()
     uvicorn.main.main([
         "backend.src.app:app",
-        "--host=127.0.0.1",
-        "--port=8000",
+        f"--host={settings.host}",
+        f"--port={settings.port}",
+        f"--log-level={settings.log_level}",
         "--workers=1",
         *sys.argv[1:],
     ])

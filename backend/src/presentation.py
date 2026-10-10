@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from experiments.nimble_experiments import UNIT_SYMBOLS, normalize
+from experiments.classifier_experiments import UNIT_SYMBOLS, canonical_value, normalize
 
 from backend.src.schemas import AnalysisResponse, Candidate, Property
 
@@ -14,8 +14,9 @@ def describe_fact(fact: dict) -> str:
 def analysis_response(report: dict, run_id: str) -> AnalysisResponse:
     facts = {fact["id"]: fact for fact in report["categorical_facts"]}
     ambiguous = {fid for candidate in report["candidates"] for fid in candidate["uncertain"]}
-    properties = [Property(name=f["name"], value=f["value"]) for fid, f in facts.items()
-                  if f["accepted"] and fid not in ambiguous]
+    accepted = {(f["name"], canonical_value(f["name"], f["value"])) for fid, f in facts.items()
+                if f["accepted"] and fid not in ambiguous}
+    properties = [Property(name=name, value=value) for name, value in accepted]
     for binding in report["numeric_bindings"]:
         name = next((check["name"] for candidate in report["candidates"]
                      for check in candidate["numeric_checks"]

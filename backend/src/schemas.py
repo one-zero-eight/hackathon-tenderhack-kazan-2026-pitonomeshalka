@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from experiments.config import env
+
 
 class ExtraCharacteristic(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -15,9 +17,9 @@ class AnalysisRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     text: str = Field(min_length=1, max_length=10000)
     scope: Literal["all", "drills", "tools", "clothing", "furniture"] = "all"
-    top_k: int = Field(default=8, ge=1, le=32)
-    chunk_size: int = Field(default=4, ge=1, le=8)
-    threshold: float = Field(default=0.8, ge=0, le=1, allow_inf_nan=False)
+    top_k: int = Field(default=int(env("PIPELINE_TOP_K")), ge=1, le=32)
+    chunk_size: int = Field(default=int(env("PIPELINE_CHUNK_SIZE")), ge=1, le=8)
+    threshold: float = Field(default=float(env("PIPELINE_THRESHOLD")), ge=0, le=1, allow_inf_nan=False)
     extras: list[ExtraCharacteristic] = Field(default_factory=list, max_length=50)
 
     @field_validator("text")

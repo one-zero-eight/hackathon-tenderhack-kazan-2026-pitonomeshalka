@@ -62,9 +62,9 @@ All saved health files report the same base revision `c202236235762e1c871ad0ccb6
 **Next evidence to collect.** Run the follow-up without `--dry-run` to test normalized numeric representations and clearer conflicts/corrections across the three domains. Then run the Python pipeline live to test product-name relevance, numeric ownership, required-field reporting and extras. Those tests are not covered by the current family categorical scans.
 
 ```bash
-uv run --locked python experiments/nimble_experiments.py --suite followup
+uv run --locked python experiments/classifier_experiments.py --suite followup
 
-uv run --locked python experiments/nimble_pipeline.py \
+uv run --locked python experiments/classifier_pipeline.py \
   --text 'Нужна аккумуляторная дрель 18 В с реверсом, без ударного режима.'
 ```
 

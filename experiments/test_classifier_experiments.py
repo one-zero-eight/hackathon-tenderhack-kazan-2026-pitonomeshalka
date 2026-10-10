@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-import nimble_experiments as experiment
+import classifier_experiments as experiment
 
 
 class ProtocolTests(unittest.TestCase):
@@ -23,7 +23,7 @@ class ProtocolTests(unittest.TestCase):
             self.assertEqual(set(question["criteria"]), set(experiment.STATUSES))
             return io.BytesIO(json.dumps(response).encode())
         with patch.object(experiment, "urlopen", fake_urlopen):
-            result = experiment.SystemOneClient().infer(job["body"])
+            result = experiment.ClassifierClient("http://127.0.0.1:8769").infer(job["body"])
         self.assertEqual(result["response"], response)
 
     def test_invalid_distribution_is_rejected(self):
@@ -31,7 +31,7 @@ class ProtocolTests(unittest.TestCase):
         response = {"model": experiment.MODEL, "answers": {"fact": {"choice": "supported", "probabilities": {k: .5 for k in experiment.STATUSES}}}}
         with patch.object(experiment, "urlopen", return_value=io.BytesIO(json.dumps(response).encode())):
             with self.assertRaisesRegex(ValueError, "sum to one"):
-                experiment.SystemOneClient().infer(job["body"])
+                experiment.ClassifierClient().infer(job["body"])
 
     def test_numeric_spans_and_unit_conversion(self):
         text = "Дрель 0,018 кВ; зарядник 220 В; ширина упаковки 12 см."
@@ -70,6 +70,21 @@ class NarrowingTests(unittest.TestCase):
         candidates = experiment.narrow_candidates(self.positions, self.facts, self.records(battery="supported", mains="supported"))
         self.assertTrue(all(c["compatible"] for c in candidates))
         self.assertTrue(all(c["uncertain"] for c in candidates))
+
+    def test_battery_power_aliases_do_not_create_false_conflicts(self):
+        facts = self.facts + [{"id": "battery_alias", "name": "Тип питания",
+                               "value": "От аккумуляторных батарей", "unit_code": ""}]
+        candidates = experiment.narrow_candidates(
+            self.positions, facts, self.records(battery="supported", battery_alias="supported"))
+        battery, mains = candidates
+        self.assertTrue(battery["compatible"])
+        self.assertEqual(battery["uncertain"], [])
+        self.assertEqual(set(battery["matches"]), {"battery", "battery_alias"})
+        self.assertFalse(mains["compatible"])
+        # Aliases also match a position whose own catalog spelling differs.
+        self.positions[0]["characteristics"][0]["values"][0]["text"] = "От аккумуляторных батарей"
+        candidates = experiment.narrow_candidates(self.positions, facts, self.records(battery="supported"))
+        self.assertTrue(candidates[0]["compatible"])
 
     def test_failed_requests_are_counted_in_diagnostic_denominator(self):
         record = {"experiment": "smoke", "expected": {"fact": "supported"}, "error": "timeout"}

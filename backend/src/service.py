@@ -2,15 +2,21 @@
 
 from datetime import datetime, timezone
 import json
+import logging
 from threading import Lock
+from time import perf_counter
 from uuid import uuid4
 
-from experiments import nimble_experiments as ne
-from experiments import nimble_pipeline as pipeline
+from experiments import classifier_experiments as ce
+from experiments import classifier_pipeline as pipeline
+from experiments.embedding_retrieval import EmbeddingError, EmbeddingRetriever, MeowEmbedClient
 
 from backend.src.presentation import analysis_response
 from backend.src.schemas import AnalysisRequest, AnalysisResponse, CandidateReference, PreviewResponse
 from backend.src.settings import Settings
+from backend.src.storage import current_run
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class ModelBusy(RuntimeError):
@@ -31,21 +37,33 @@ def load_catalog(settings: Settings):
     if settings.catalog_path.exists():
         return json.loads(settings.catalog_path.read_text(encoding="utf-8"))
     # Match the CLI: import the supplied XML if no cached snapshot exists.
-    return ne.load_catalog()
+    return ce.load_catalog(settings.xml_dir)
 
 
 class PipelineService:
-    def __init__(self, settings, catalog, client_factory=ne.SystemOneClient):
+    def __init__(self, settings, catalog, client_factory=ce.ClassifierClient,
+                 embedding_client_factory=MeowEmbedClient, *, store):
         self.settings = settings
         self.catalog = catalog
         self.client_factory = client_factory
         self.model_lock = Lock()
+        self.store = store
+        embedding_client = embedding_client_factory(settings.embedding_base_url, settings.embedding_model,
+                                                    settings.embedding_timeout_seconds)
+        embedding_client.recorder = store
+        self.retriever = EmbeddingRetriever(
+            catalog, embedding_client, None, settings.embedding_batch_size, settings.embedding_max_names,
+            cache_store=store,
+        )
 
     def prepare(self, request: AnalysisRequest) -> dict:
         try:
+            retrieval = self.retriever.retrieve(self.catalog, request.text, request.scope, request.top_k)
             return pipeline.prepare(self.catalog, request.text, request.scope,
                                     request.top_k, request.chunk_size,
-                                    self.settings.max_questions)
+                                    self.settings.max_questions, retrieval=retrieval)
+        except EmbeddingError as error:
+            raise InferenceFailure("Embedding retrieval failed: " + str(error)) from error
         except ValueError as error:
             message = str(error).replace("--max-questions", "BACKEND_MAX_QUESTIONS")
             raise InvalidPlan(message.replace("--top-k", "top_k").replace("--scope", "scope")) from error
@@ -62,8 +80,8 @@ class PipelineService:
         if not self.model_lock.acquire(blocking=False):
             raise ModelBusy("A model request is already running; try again after it finishes")
         try:
-            client = self.client_factory(self.settings.base_url,
-                                         min(5, self.settings.timeout_seconds))
+            client = self.client_factory(self.settings.classifier_base_url,
+                                         min(self.settings.classifier_health_timeout_seconds, self.settings.classifier_timeout_seconds))
             try:
                 return client.health()
             except (RuntimeError, ValueError) as error:
@@ -72,25 +90,34 @@ class PipelineService:
             self.model_lock.release()
 
     def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
-        plan = self.prepare(request)
         if not self.model_lock.acquire(blocking=False):
             raise ModelBusy("A model request is already running; try again after it finishes")
+        run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + uuid4().hex
+        token = current_run.set(run_id)
+        saved = False
+        finalized = False
         try:
-            run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + uuid4().hex
-            output = self.settings.results_dir / run_id
+            started = perf_counter()
+            self.store.begin_run(run_id, request.model_dump(mode="json"))
+            saved = True
+            logger.info("Analysis started: run_id=%s", run_id)
+            plan = self.prepare(request)
+            self.store.save_catalog(self.catalog)
+            self.store.save_plan(run_id, plan)
+            logger.info("Analysis plan: run_id=%s requests=%d questions=%d", run_id,
+                        len(plan["jobs"]), plan["question_count"])
             records = []
             failure = None
             if plan["jobs"]:
-                client = self.client_factory(self.settings.base_url, self.settings.timeout_seconds)
+                client = self.client_factory(self.settings.classifier_base_url, self.settings.classifier_timeout_seconds)
                 try:
-                    records, _ = ne.run_jobs(client, plan["jobs"], output,
-                                            self.catalog, request.threshold, request.scope)
+                    records, _ = ce.run_jobs(client, plan["jobs"], None,
+                                            self.catalog, request.threshold, request.scope,
+                                            evidence_store=self.store, run_id=run_id)
                 except (RuntimeError, ValueError) as error:
-                    # The runner saves startup_error.json when the health check fails.
+                    # The runner retains the health failure as a database artifact.
                     failure = str(error)
                 failure = failure or next((r["error"] for r in records if "error" in r), None)
-            else:
-                output.mkdir(parents=True, exist_ok=False)
             report = pipeline.analyze(plan, records, request.threshold, request.confirmed_extras())
             result = analysis_response(report, run_id)
             details = dict(
@@ -98,13 +125,20 @@ class PipelineService:
                 planned_requests=len(plan["jobs"]), planned_questions=plan["question_count"],
                 successful_requests=sum("response" in record for record in records), analysis=report,
             )
-            for name, data in (("analysis.json", details),
-                               ("response.json", result.model_dump(mode="json", exclude_defaults=True)),
-                               ("request_plan.json", plan["jobs"])):
-                (output / name).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-                                          encoding="utf-8")
+            self.store.finish_run(run_id, details, result.model_dump(mode="json", exclude_defaults=True), failure)
+            finalized = True
+            logger.info("Analysis saved: run_id=%s status=%s complete_inference=%s elapsed=%.3fs storage=postgresql",
+                        run_id, result.status, result.complete_inference, perf_counter() - started)
             if failure:
                 raise InferenceFailure(failure, result)
             return result
+        except Exception as error:
+            if saved and not finalized:
+                try:
+                    self.store.fail_run(run_id, error)
+                except Exception:
+                    logger.exception("Could not save failure for run_id=%s", run_id)
+            raise
         finally:
+            current_run.reset(token)
             self.model_lock.release()

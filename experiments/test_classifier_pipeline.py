@@ -5,8 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-import nimble_experiments as ne
-import nimble_pipeline as pipeline
+import classifier_experiments as ce
+import classifier_pipeline as pipeline
 
 
 def distribution(choice, choices, probability=.95):
@@ -43,7 +43,7 @@ def answer_jobs(plan, power="supported", numeric="span_0"):
                 choice = numeric
             answers[qid] = distribution(choice, question["criteria"])
         records.append(dict({k: v for k, v in job.items() if k != "body"}, request=job["body"],
-                            response={"model": ne.MODEL, "answers": answers}, elapsed_seconds=.1))
+                            response={"model": ce.MODEL, "answers": answers}, elapsed_seconds=.1))
     return records
 
 
@@ -58,7 +58,7 @@ class ConstraintTests(unittest.TestCase):
             if record["experiment"] == "pipeline_product":
                 continue
             for qid, answer in record["response"]["answers"].items():
-                record["response"]["answers"][qid] = distribution("unknown", ne.STATUSES)
+                record["response"]["answers"][qid] = distribution("unknown", ce.STATUSES)
         report = pipeline.analyze(plan, records)
         self.assertEqual(sum(c["compatible"] for c in report["candidates"]), 2)
         self.assertIn("Тип питания", report["clarifying_question"])
@@ -109,7 +109,7 @@ class ConstraintTests(unittest.TestCase):
         records = answer_jobs(plan)
         for record in records:
             for qid in record["response"]["answers"]:
-                record["response"]["answers"][qid] = distribution("supported", ne.STATUSES)
+                record["response"]["answers"][qid] = distribution("supported", ce.STATUSES)
         report = pipeline.analyze(plan, records)
         self.assertTrue(all(c["compatible"] and c["uncertain"] for c in report["candidates"]))
         self.assertIsNone(report["provisional_candidate"])
@@ -139,7 +139,7 @@ class ConstraintTests(unittest.TestCase):
     def test_product_name_must_be_supported_before_provisional_selection(self):
         plan = pipeline.prepare(self.catalog, "Аккумуляторная дрель 18 В.")
         records = answer_jobs(plan)
-        records[0]["response"]["answers"][records[0]["id"]] = distribution("unknown", ne.STATUSES)
+        records[0]["response"]["answers"][records[0]["id"]] = distribution("unknown", ce.STATUSES)
         report = pipeline.analyze(plan, records)
         self.assertIsNone(report["provisional_candidate"])
         self.assertIn("вид самого товара", report["clarifying_question"])
@@ -152,7 +152,7 @@ class ConstraintTests(unittest.TestCase):
         records = answer_jobs(plan)
         for record in records:
             if record.get("product_name") == mechanical["name"]:
-                record["response"]["answers"][record["id"]] = distribution("contradicted", ne.STATUSES, .7492505619293989)
+                record["response"]["answers"][record["id"]] = distribution("contradicted", ce.STATUSES, .7492505619293989)
         report = pipeline.analyze(plan, records)
         self.assertEqual(report["provisional_candidate"], "battery")
         self.assertIn("Напряжение аккумулятора", report["clarifying_question"])
@@ -205,7 +205,7 @@ class ConstraintTests(unittest.TestCase):
 
 class FollowupTests(unittest.TestCase):
     def test_numeric_ab_keeps_input_instructions_and_labels_identical(self):
-        jobs = ne.followup_jobs()
+        jobs = ce.followup_jobs()
         self.assertEqual(len(jobs), 29)
         for raw, normalized in zip(jobs[:12:2], jobs[1:12:2]):
             body = deepcopy(normalized["body"])
@@ -218,16 +218,16 @@ class FollowupTests(unittest.TestCase):
 
     def test_precision_recall_errors_and_empty_denominators(self):
         records = [{"experiment": "fact_followup", "expected": {"fact": expected},
-                    "response": {"answers": {"fact": distribution(predicted, ne.STATUSES)}}}
+                    "response": {"answers": {"fact": distribution(predicted, ce.STATUSES)}}}
                    for expected, predicted in (("supported", "supported"), ("unknown", "supported"), ("supported", "unknown"))]
         records.append({"experiment": "fact_followup", "expected": {"fact": "supported"}, "error": "timeout"})
-        metrics = ne.supported_metrics(records)
+        metrics = ce.supported_metrics(records)
         self.assertEqual(metrics["supported_precision"], .5)
         self.assertEqual(metrics["supported_recall"], .5)
         self.assertEqual(metrics["accepted_unsupported_additions"], 1)
         self.assertEqual(metrics["errors"], 1)
-        self.assertIsNone(ne.supported_metrics([])["supported_precision"])
-        report = ne.followup_report([], ne.followup_jobs())
+        self.assertIsNone(ce.supported_metrics([])["supported_precision"])
+        report = ce.followup_report([], ce.followup_jobs())
         self.assertFalse(report["complete"])
         self.assertEqual(len(report["numeric_pairs"]), 6)
         self.assertEqual(report["numeric_pairs"][0]["raw"], {"error": "not executed"})
@@ -237,17 +237,17 @@ class FollowupTests(unittest.TestCase):
             base_url = "offline://fixture"
             timeout = 1
             def health(self):
-                return {"model": ne.MODEL}
+                return {"model": ce.MODEL}
             def infer(self, body):
-                return {"request": body, "response": {"model": ne.MODEL, "answers": {
+                return {"request": body, "response": {"model": ce.MODEL, "answers": {
                     qid: distribution("unknown", question["criteria"]) for qid, question in body["questions"].items()}}, "elapsed_seconds": .1}
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "binding"
             plan = pipeline.prepare(catalog_fixture(), "Дрель 18 В.")
-            records, _ = ne.run_jobs(FakeClient(), plan["jobs"], path)
+            records, _ = ce.run_jobs(FakeClient(), plan["jobs"], path)
             self.assertIn("bound_measurement", records[-1])
             followup = Path(tmp) / "followup"
-            ne.run_jobs(FakeClient(), ne.followup_jobs(), followup)
+            ce.run_jobs(FakeClient(), ce.followup_jobs(), followup)
             report = json.loads((followup / "followup_report.json").read_text())
             self.assertTrue(report["complete"])
             self.assertEqual(report["supported_facts"]["evaluated"], 17)
