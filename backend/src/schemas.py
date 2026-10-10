@@ -1,6 +1,6 @@
-"""API input limits and the complete explanation returned by the pipeline."""
+"""Small, typed API contracts; detailed model evidence is saved separately."""
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -32,37 +32,51 @@ class AnalysisRequest(BaseModel):
         return [dict(extra.model_dump(), origin="user_supplied") for extra in self.extras]
 
 
-class AnalysisReport(BaseModel):
-    status: Literal["retrieval_miss", "incomplete_inference",
-                    "no_compatible_shortlist_candidate", "needs_clarification"]
-    final_code: None
-    provisional_candidate: str | None
-    input: str
-    retrieval: dict[str, Any]
-    complete_inference: bool
-    threshold_uncalibrated: float
-    categorical_facts: list[dict[str, Any]]
-    numeric_bindings: list[dict[str, Any]]
-    unbound_measurements: list[dict[str, Any]]
-    unresolved_numeric: list[dict[str, Any]]
-    candidates: list[dict[str, Any]]
-    clarifying_question: str
-    limits: list[str]
+class CandidateReference(BaseModel):
+    code: str
+    version: str
+    name: str
 
 
-class PipelineResponse(BaseModel):
-    mode: Literal["preview", "live"]
-    run_id: str | None
-    catalog_sha256: str
+class Property(BaseModel):
+    name: str
+    value: str
+
+
+class ExtraPropertyDecision(Property):
+    action: Literal["map_and_validate", "do_not_add", "review_before_add", "additional_field_policy_unknown"]
+
+
+class Candidate(CandidateReference):
+    status: Literal["supported", "uncertain", "rejected"]
+    reasons: list[str]
+    missing_required: list[str] = Field(default_factory=list)
+    unmatched_properties: list[str] = Field(default_factory=list)
+    extra_characteristics: list[ExtraPropertyDecision] = Field(default_factory=list)
+
+
+class PreviewResponse(BaseModel):
     planned_requests: int
     planned_questions: int
-    successful_requests: int
-    analysis: AnalysisReport
+    candidates: list[CandidateReference]
+
+
+class AnalysisResponse(BaseModel):
+    run_id: str
+    status: Literal["retrieval_miss", "incomplete_inference", "no_compatible_shortlist_candidate",
+                    "needs_clarification", "ready_for_review"]
+    complete_inference: bool
+    recommended_candidate: str | None
+    requires_review: Literal[True]
+    properties: list[Property]
+    candidates: list[Candidate]
+    clarifying_question: str | None
+    warnings: list[str]
 
 
 class FailureDetail(BaseModel):
     error: str
-    result: PipelineResponse | None = None
+    result: AnalysisResponse | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -71,13 +85,9 @@ class ErrorResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: Literal["ok"]
-    catalog_positions: int
-    catalog_facts: int
     model_busy: bool
-    model: str
-    model_readiness: Literal["not_checked"]
 
 
 class ModelHealthResponse(BaseModel):
     status: Literal["ok"]
-    upstream: dict[str, Any]
+    model: str

@@ -213,10 +213,17 @@ def analyze(plan, records, threshold=0.8, confirmed_extras=()):
                       else "review_before_add" if position["no_new_features"] == "false" else "additional_field_policy_unknown")
             candidate["extra_characteristics"].append(dict(extra, action=action))
         candidate["lifecycle_review_required"] = True
+        candidate["assessment"] = (
+            "rejected" if not candidate["compatible"] else
+            "uncertain" if not candidate["object_supported"] or candidate["uncertain"]
+            or any(check["status"] == "uncertain" for check in candidate["numeric_checks"]) else
+            "supported"
+        )
         candidates.append(candidate)
     job_ids = {r["id"] for r in records if "response" in r}
     complete = all(j["id"] in job_ids for j in plan["jobs"])
     survivors = [c for c in candidates if c["compatible"]]
+    supported = [c for c in candidates if c["assessment"] == "supported"]
     conflicts = [f for f in extracted if f["status"] == "conflicting"]
     uncertain = [c for c in survivors if c["uncertain"]]
     object_uncertain = [c for c in survivors if not c["object_supported"]]
@@ -232,15 +239,18 @@ def analyze(plan, records, threshold=0.8, confirmed_extras=()):
     elif conflicts or unresolved or uncertain:
         status = "needs_clarification"
         question = "Уточните противоречивые характеристики перед исключением кандидатов."
+    elif supported:
+        status = "needs_clarification" if len(supported) > 1 or any(c["missing_required"] for c in supported) else "ready_for_review"
+        question = clarification(plan, supported, extracted) if status == "needs_clarification" else None
     elif object_uncertain:
         status = "needs_clarification"
-        question = "Уточните вид самого товара: " + "; ".join(sorted({c["name"] for c in object_uncertain})) + "."
+        question = "Уточните вид самого товара: выберите или уточните " + "; ".join(sorted({c["name"] for c in object_uncertain})) + "."
     else:
         status = "needs_clarification"
         question = clarification(plan, survivors, extracted)
     return {
         "status": status, "final_code": None,
-        "provisional_candidate": survivors[0]["code"] if len(survivors) == 1 and complete and not (conflicts or unresolved or uncertain or object_uncertain) else None,
+        "provisional_candidate": supported[0]["code"] if len(supported) == 1 and complete and not (conflicts or unresolved or uncertain) else None,
         "input": plan["text"], "retrieval": {k: v for k, v in plan["retrieval"].items() if k != "positions"},
         "complete_inference": complete, "threshold_uncalibrated": threshold,
         "categorical_facts": extracted, "numeric_bindings": [{"name": name, "okei": unit, "spans": spans} for (name, unit), spans in bindings.items()],
@@ -271,7 +281,10 @@ def clarification(plan, survivors, extracted):
     missing = Counter(c["name"] for candidate in survivors for c in candidate["missing_required"])
     if missing:
         name = sorted(missing, key=lambda n: (-missing[n], n))[0]
-        return f"Укажите обязательную характеристику '{name}' самого товара и её единицу измерения, если значение числовое."
+        units = sorted({ne.UNIT_SYMBOLS.get(v["unit_code"], v.get("unit_name", "")) for candidate in survivors
+                        for char in positions[candidate["key"]]["characteristics"] if char["name"] == name
+                        for v in char["values"] if v["unit_code"] in ne.UNIT_SYMBOLS or v.get("unit_name")})
+        return f"Укажите «{name}»" + (f" ({', '.join(units)})." if units else ".")
     if len(survivors) > 1:
         return "Уточните вид и назначение товара: " + "; ".join(sorted({c["name"] for c in survivors})) + "."
     return "Подтвердите извлечённые характеристики и проверьте применимость позиции; эксперимент ещё не выдаёт окончательный код."

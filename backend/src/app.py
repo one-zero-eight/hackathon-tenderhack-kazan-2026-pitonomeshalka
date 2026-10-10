@@ -26,7 +26,7 @@ def inference_failure_handler(request: Request, error: InferenceFailure) -> JSON
         status_code=502,
         content={"detail": {
             "error": str(error),
-            "result": error.result.model_dump(mode="json") if error.result else None,
+            "result": error.result.model_dump(mode="json", exclude_defaults=True) if error.result else None,
         }},
     )
 

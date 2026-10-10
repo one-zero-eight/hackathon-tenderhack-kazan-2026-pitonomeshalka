@@ -1,4 +1,6 @@
 from copy import deepcopy
+from contextlib import redirect_stdout
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -40,6 +42,7 @@ class FakeModel:
         self.calls = []
         self.fail_at = None
         self.offline = False
+        self.overrides = {}
         self.base_url = "http://fake"
         self.timeout = 1
 
@@ -61,8 +64,9 @@ class FakeModel:
         for qid, question in body["questions"].items():
             choices = question["criteria"]
             choice = "span_0" if qid == "measurement" else "contradicted" if qid == "mains" else "supported"
+            choice, confidence = self.overrides.get(qid, (choice, .95))
             answers[qid] = dict(choice=choice, probabilities={
-                key: .95 if key == choice else .05 / (len(choices) - 1) for key in choices
+                key: confidence if key == choice else (1 - confidence) / (len(choices) - 1) for key in choices
             })
         return dict(request=body, response=dict(model=ne.MODEL, answers=answers), elapsed_seconds=.01)
 
@@ -88,21 +92,18 @@ class ApiTests(unittest.TestCase):
         for _ in range(2):
             response = self.client.get("/health")
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["catalog_positions"], 2)
-            self.assertEqual(response.json()["model_readiness"], "not_checked")
+            self.assertEqual(response.json(), {"status": "ok", "model_busy": False})
         self.assertEqual(self.load_count, 1)
         self.assertEqual(self.model.health_calls, 0)
 
-    def test_preview_preserves_offsets_and_never_calls_model_or_writes(self):
+    def test_preview_returns_only_plan_counts_and_candidate_identifiers(self):
         response = self.client.post("/preview", json=self.body)
         self.assertEqual(response.status_code, 200)
         result = response.json()
-        self.assertEqual(result["mode"], "preview")
+        self.assertEqual(set(result), {"planned_requests", "planned_questions", "candidates"})
         self.assertEqual(result["planned_requests"], 3)
         self.assertEqual(result["planned_questions"], 4)
-        self.assertEqual(result["analysis"]["status"], "incomplete_inference")
-        span = result["analysis"]["unbound_measurements"][0]
-        self.assertEqual(self.body["text"][span["start"]:span["end"]], span["raw"])
+        self.assertTrue(all(set(candidate) == {"code", "version", "name"} for candidate in result["candidates"]))
         self.assertEqual(self.model.health_calls, 0)
         self.assertEqual(self.model.calls, [])
         self.assertFalse(self.settings.results_dir.exists())
@@ -112,33 +113,73 @@ class ApiTests(unittest.TestCase):
         response = self.client.post("/analyze", json=body)
         self.assertEqual(response.status_code, 200)
         result = response.json()
-        self.assertEqual(result["successful_requests"], 3)
-        self.assertTrue(result["analysis"]["complete_inference"])
-        self.assertEqual(result["analysis"]["provisional_candidate"], "battery")
-        self.assertIsNone(result["analysis"]["final_code"])
-        battery = next(c for c in result["analysis"]["candidates"] if c["code"] == "battery")
-        self.assertEqual(battery["numeric_checks"][0]["status"], "matched")
-        self.assertEqual(battery["numeric_checks"][0]["span"]["value"], "18.000")
+        self.assertTrue(result["complete_inference"])
+        self.assertEqual(result["recommended_candidate"], "battery@1")
+        self.assertTrue(result["requires_review"])
+        self.assertEqual(result["status"], "ready_for_review")
+        self.assertIsNone(result["clarifying_question"])
+        self.assertIn({"name": "Напряжение аккумулятора", "value": "18 В"}, result["properties"])
+        battery = result["candidates"][0]
+        self.assertEqual(battery["status"], "supported")
         self.assertEqual(battery["extra_characteristics"][0]["action"], "do_not_add")
-        self.assertEqual(battery["extra_characteristics"][0]["origin"], "user_supplied")
         run = self.settings.results_dir / result["run_id"]
-        self.assertEqual(json.loads((run / "analysis.json").read_text()), result)
+        self.assertEqual(json.loads((run / "response.json").read_text()), result)
+        details = json.loads((run / "analysis.json").read_text())
+        self.assertEqual(details["successful_requests"], 3)
+        self.assertIsNone(details["analysis"]["final_code"])
+        raw_battery = next(c for c in details["analysis"]["candidates"] if c["code"] == "battery")
+        self.assertEqual(raw_battery["extra_characteristics"][0]["origin"], "user_supplied")
+        span = raw_battery["numeric_checks"][0]["span"]
+        self.assertEqual(span["value"], "18.000")
+        self.assertEqual(self.body["text"][span["start"]:span["end"]], span["raw"])
         self.assertEqual(len((run / "requests.jsonl").read_text().splitlines()), 3)
-        self.assertEqual(json.loads((run / "manifest.json").read_text())["catalog_sha256"], result["catalog_sha256"])
+        outgoing = [json.loads(line) for line in (run / "model_requests.jsonl").read_text().splitlines()]
+        self.assertEqual([entry["request"] for entry in outgoing], self.model.calls)
+        self.assertTrue(all(entry["url"] == "http://127.0.0.1:8769/v1/systemone" for entry in outgoing))
+        self.assertEqual(json.loads((run / "manifest.json").read_text())["catalog_sha256"], details["catalog_sha256"])
+
+    def test_model_requests_are_logged_before_dispatch_including_failed_call(self):
+        self.model.fail_at = 2
+        infer = self.model.infer
+
+        def check_log_then_infer(body):
+            run = next(self.settings.results_dir.iterdir())
+            outgoing = [json.loads(line) for line in (run / "model_requests.jsonl").read_text().splitlines()]
+            # The pending call must already be visible to another reader.
+            self.assertEqual(len(outgoing), len(self.model.calls) + 1)
+            self.assertEqual(outgoing[-1]["request"], body)
+            self.assertEqual(outgoing[-1]["method"], "POST")
+            self.assertTrue(outgoing[-1]["logged_at"])
+            return infer(body)
+
+        console = io.StringIO()
+        with patch.object(self.model, "infer", side_effect=check_log_then_infer), redirect_stdout(console):
+            response = self.client.post("/analyze", json=self.body)
+        self.assertEqual(response.status_code, 502)
+        run = self.settings.results_dir / response.json()["detail"]["result"]["run_id"]
+        outgoing = [json.loads(line) for line in (run / "model_requests.jsonl").read_text().splitlines()]
+        completed = [json.loads(line) for line in (run / "requests.jsonl").read_text().splitlines()]
+        self.assertEqual(len(outgoing), 2)
+        self.assertEqual([entry["id"] for entry in outgoing], [entry["id"] for entry in completed])
+        self.assertIn("error", completed[-1])
+        console_requests = [json.loads(line.removeprefix("Model request: "))
+                            for line in console.getvalue().splitlines() if line.startswith("Model request: ")]
+        self.assertEqual(console_requests, outgoing)
+        self.assertIn(self.body["text"], console.getvalue())
 
     def test_missing_required_information_remains_visible(self):
         response = self.client.post("/analyze", json=dict(text="Аккумуляторная дрель", scope="drills"))
         self.assertEqual(response.status_code, 200)
-        analysis = response.json()["analysis"]
+        analysis = response.json()
         battery = next(c for c in analysis["candidates"] if c["code"] == "battery")
-        self.assertEqual(battery["missing_required"][0]["name"], "Напряжение аккумулятора")
+        self.assertEqual(battery["missing_required"], ["Напряжение аккумулятора"])
         self.assertIn("Напряжение аккумулятора", analysis["clarifying_question"])
 
     def test_retrieval_miss_does_not_require_model(self):
         self.model.offline = True
         response = self.client.post("/analyze", json=dict(text="Несуществующий продукт"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["analysis"]["status"], "retrieval_miss")
+        self.assertEqual(response.json()["status"], "retrieval_miss")
         self.assertEqual(self.model.health_calls, 0)
         self.assertEqual(self.model.calls, [])
 
@@ -179,7 +220,7 @@ class ApiTests(unittest.TestCase):
         response = self.client.post("/analyze", json=self.body)
         self.assertEqual(response.status_code, 502)
         result = response.json()["detail"]["result"]
-        self.assertEqual(result["analysis"]["status"], "incomplete_inference")
+        self.assertEqual(result["status"], "incomplete_inference")
         run = self.settings.results_dir / result["run_id"]
         self.assertTrue((run / "startup_error.json").exists())
         self.assertTrue((run / "analysis.json").exists())
@@ -190,11 +231,11 @@ class ApiTests(unittest.TestCase):
         response = self.client.post("/analyze", json=self.body)
         self.assertEqual(response.status_code, 502)
         result = response.json()["detail"]["result"]
-        self.assertEqual(result["successful_requests"], 1)
-        self.assertFalse(result["analysis"]["complete_inference"])
-        self.assertIsNone(result["analysis"]["provisional_candidate"])
+        self.assertFalse(result["complete_inference"])
+        self.assertIsNone(result["recommended_candidate"])
         self.assertEqual(len(self.model.calls), 2)
         run = self.settings.results_dir / result["run_id"]
+        self.assertEqual(json.loads((run / "analysis.json").read_text())["successful_requests"], 1)
         records = [json.loads(line) for line in (run / "requests.jsonl").read_text().splitlines()]
         self.assertIn("response", records[0])
         self.assertIn("error", records[1])
@@ -203,7 +244,7 @@ class ApiTests(unittest.TestCase):
     def test_model_health_is_separate_and_uses_short_timeout(self):
         response = self.client.get("/health/model")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["upstream"]["model"], ne.MODEL)
+        self.assertEqual(response.json(), {"status": "ok", "model": ne.MODEL})
         self.assertEqual(self.model.timeout, 5)
         self.model.offline = True
         self.assertEqual(self.client.get("/health/model").status_code, 502)
@@ -213,7 +254,57 @@ class ApiTests(unittest.TestCase):
         self.assertIn("/preview", schema["paths"])
         responses = schema["paths"]["/analyze"]["post"]["responses"]
         self.assertTrue({"200", "422", "502", "503"} <= responses.keys())
-        self.assertIn("AnalysisReport", schema["components"]["schemas"])
+        self.assertIn("AnalysisResponse", schema["components"]["schemas"])
+        self.assertIn("PreviewResponse", schema["components"]["schemas"])
+
+    def test_weakly_rejected_alternative_does_not_hide_supported_candidate(self):
+        mechanical = deepcopy(self.catalog["positions"][0])
+        mechanical.update(key="mechanical@1", code="mechanical", name="Дрель ручная механическая", characteristics=[])
+        self.app.state.pipeline.catalog["positions"].append(mechanical)
+        qid = "product_" + ne.identity(mechanical["name"])
+        self.model.overrides[qid] = ("contradicted", .7492505619293989)
+        response = self.client.post("/analyze", json={"text": "Аккумуляторная дрель", "scope": "all"})
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["recommended_candidate"], "battery@1")
+        self.assertIn("Напряжение аккумулятора", result["clarifying_question"])
+        self.assertNotIn("механическая", result["clarifying_question"])
+        alternative = next(c for c in result["candidates"] if c["code"] == "mechanical")
+        self.assertEqual(alternative["status"], "uncertain")
+        self.assertNotIn("missing_required", alternative)
+        self.assertEqual(alternative["unmatched_properties"], ["Тип питания"])
+        self.assertTrue(result["warnings"])
+
+    def test_compact_result_preserves_conflicts_without_claiming_a_recommendation(self):
+        self.model.overrides["mains"] = ("supported", .95)
+        response = self.client.post("/analyze", json=self.body)
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertIsNone(result["recommended_candidate"])
+        self.assertEqual(result["status"], "needs_clarification")
+        self.assertTrue(all(c["status"] == "uncertain" for c in result["candidates"]))
+        self.assertTrue(any("Тип питания" in reason for c in result["candidates"] for reason in c["reasons"]))
+        self.assertFalse(any(property["name"] == "Тип питания" for property in result["properties"]))
+        self.assertTrue(any("Тип питания" in warning for warning in result["warnings"]))
+
+    def test_numeric_conflict_has_a_readable_reason(self):
+        response = self.client.post("/analyze", json={"text": "Аккумуляторная дрель 20 В", "scope": "drills"})
+        result = response.json()
+        self.assertEqual(result["status"], "no_compatible_shortlist_candidate")
+        self.assertIsNone(result["recommended_candidate"])
+        self.assertTrue(all(c["status"] == "rejected" for c in result["candidates"]))
+        self.assertTrue(all("missing_required" not in c for c in result["candidates"]))
+        battery = next(c for c in result["candidates"] if c["code"] == "battery")
+        self.assertTrue(any("20 В" in reason and "вне допустимых" in reason for reason in battery["reasons"]))
+
+    def test_numeric_rejection_does_not_promote_a_weak_product_rejection(self):
+        qid = "product_" + ne.identity("Дрель ручная электрическая")
+        self.model.overrides[qid] = ("contradicted", .75)
+        result = self.client.post("/analyze", json={"text": "Аккумуляторная дрель 20 В"}).json()
+        battery = next(c for c in result["candidates"] if c["code"] == "battery")
+        self.assertEqual(battery["status"], "rejected")
+        self.assertTrue(any("20 В" in reason for reason in battery["reasons"]))
+        self.assertNotIn("Указанный вид товара не соответствует описанию.", battery["reasons"])
 
     def test_catalog_cache_and_xml_fallback(self):
         cache = Path(self.directory.name) / "catalog.json"

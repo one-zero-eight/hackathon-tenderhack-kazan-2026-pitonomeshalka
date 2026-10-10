@@ -249,7 +249,7 @@ Python applies the accepted evidence to each position:
 
 A contradicted hypothesis does not automatically remove a position. If a position permits both reverse=yes and reverse=no, rejecting reverse=no leaves reverse=yes available. Catalog alternatives are permissions, not assertions about the particular product.
 
-Finally, the pipeline chooses a next question. Missing inference answers are handled first; no remaining candidate prompts a contradiction/search review; conflicts prompt correction; uncertain product relevance prompts a product-type question. When those problems are resolved, it looks for an unanswered categorical property that distinguishes survivors, then for a required missing property, then for a product-type clarification.
+Finally, the pipeline classifies candidates as `supported`, `uncertain` or `rejected`. Missing inference answers are handled first; no remaining candidate prompts a contradiction/search review; conflicts prompt correction. If supported candidates exist, clarification focuses on those candidates: first an unanswered categorical property that distinguishes them, then a required missing property. An uncertain product alternative remains visible but does not make the user repeat an already supported product type. If no product identity is supported, the pipeline asks for the product type.
 
 The script returns the question as text. It does not run an interactive conversation or maintain a chat session. A user can edit the description and rerun it; the evidence and shortlist are recomputed.
 
@@ -272,7 +272,7 @@ This is enough to understand why missing required fields do not eliminate a cand
 
 The pipeline always returns `final_code: null`. Lifecycle/date eligibility, verified categorical source spans and all remaining application rules still need validation.
 
-It may return `provisional_candidate` when inference is complete, exactly one compatible candidate remains, its product name is supported, and relevant conflict/uncertainty checks permit it. That provisional field can coexist with missing required fields. It means “one candidate in this checked shortlist,” not “all specification requirements are satisfied.”
+It may return `provisional_candidate` when inference is complete, exactly one candidate has assessment `supported`, and relevant conflict/uncertainty checks permit it. Uncertain alternatives remain visible for review rather than being silently excluded. That provisional field can coexist with missing required fields. It means “one positively supported candidate in this checked shortlist,” not “all specification requirements are satisfied.” If its required fields are covered, the status becomes `ready_for_review`; this still does not issue a final code.
 
 **10. What happens to extra information.**
 
@@ -522,8 +522,10 @@ For the pipeline, useful fields are:
 | `status=incomplete_inference` | Some planned model questions have no successful complete answer |
 | `status=no_compatible_shortlist_candidate` | The performed checks ruled out this shortlist; review contradictions and retrieval coverage |
 | `status=needs_clarification` | More information or review is needed |
+| `status=ready_for_review` | The supported candidate has its required fields covered; final applicability still needs review |
 | `complete_inference` | All planned model-question jobs received answers; other validation gaps can remain |
 | `candidates[].compatible` | No implemented accepted-evidence check excludes this candidate |
+| `candidates[].assessment` | `supported` requires established product identity and no detected candidate conflict/uncertainty; otherwise `uncertain` or `rejected` |
 | `candidates[].missing_required` | Required fields without an established matching value |
 | `candidates[].uncertain` | Categorical evidence that cannot safely be used for a definite exclusion |
 | `numeric_checks[].status` | A bound number matches, conflicts or cannot be checked conclusively |

@@ -8,7 +8,8 @@ from uuid import uuid4
 from experiments import nimble_experiments as ne
 from experiments import nimble_pipeline as pipeline
 
-from backend.src.schemas import AnalysisRequest, PipelineResponse
+from backend.src.presentation import analysis_response
+from backend.src.schemas import AnalysisRequest, AnalysisResponse, CandidateReference, PreviewResponse
 from backend.src.settings import Settings
 
 
@@ -49,17 +50,13 @@ class PipelineService:
             message = str(error).replace("--max-questions", "BACKEND_MAX_QUESTIONS")
             raise InvalidPlan(message.replace("--top-k", "top_k").replace("--scope", "scope")) from error
 
-    def result(self, request, plan, records, mode, run_id=None) -> PipelineResponse:
-        return PipelineResponse(
-            mode=mode, run_id=run_id, catalog_sha256=plan["catalog_sha256"],
-            planned_requests=len(plan["jobs"]), planned_questions=plan["question_count"],
-            successful_requests=sum("response" in record for record in records),
-            analysis=pipeline.analyze(plan, records, request.threshold, request.confirmed_extras()),
-        )
-
-    def preview(self, request: AnalysisRequest) -> PipelineResponse:
+    def preview(self, request: AnalysisRequest) -> PreviewResponse:
         plan = self.prepare(request)
-        return self.result(request, plan, [], "preview")
+        return PreviewResponse(
+            planned_requests=len(plan["jobs"]), planned_questions=plan["question_count"],
+            candidates=[CandidateReference(code=p["code"], version=p["version"], name=p["name"])
+                        for p in plan["retrieval"]["positions"]],
+        )
 
     def model_health(self) -> dict:
         if not self.model_lock.acquire(blocking=False):
@@ -74,7 +71,7 @@ class PipelineService:
         finally:
             self.model_lock.release()
 
-    def analyze(self, request: AnalysisRequest) -> PipelineResponse:
+    def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
         plan = self.prepare(request)
         if not self.model_lock.acquire(blocking=False):
             raise ModelBusy("A model request is already running; try again after it finishes")
@@ -94,8 +91,15 @@ class PipelineService:
                 failure = failure or next((r["error"] for r in records if "error" in r), None)
             else:
                 output.mkdir(parents=True, exist_ok=False)
-            result = self.result(request, plan, records, "live", run_id)
-            for name, data in (("analysis.json", result.model_dump(mode="json")),
+            report = pipeline.analyze(plan, records, request.threshold, request.confirmed_extras())
+            result = analysis_response(report, run_id)
+            details = dict(
+                mode="live", run_id=run_id, catalog_sha256=plan["catalog_sha256"],
+                planned_requests=len(plan["jobs"]), planned_questions=plan["question_count"],
+                successful_requests=sum("response" in record for record in records), analysis=report,
+            )
+            for name, data in (("analysis.json", details),
+                               ("response.json", result.model_dump(mode="json", exclude_defaults=True)),
                                ("request_plan.json", plan["jobs"])):
                 (output / name).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
                                           encoding="utf-8")

@@ -264,6 +264,7 @@ def slot_jobs(catalog, text, scope="drills"):
 
 MEASURE = re.compile(r"(?<![\w.,])(?P<number>\d+(?:[.,]\d+)?)\s*(?P<unit>квт|кв|вт|в|мм|см|м|а\s*[·*]?\s*ч)(?!\w)", re.I)
 UNIT_TABLE = {"в": ("voltage", Decimal(1), "222"), "кв": ("voltage", Decimal(1000), "222"), "вт": ("power", Decimal(1), "212"), "квт": ("power", Decimal(1000), "212"), "мм": ("length", Decimal(1), "003"), "см": ("length", Decimal(10), "003"), "м": ("length", Decimal(1000), "003"), "ач": ("capacity", Decimal(1), "263")}
+UNIT_SYMBOLS = {"222": "В", "212": "Вт", "003": "мм", "263": "А·ч"}
 
 
 def measurements(text):
@@ -510,10 +511,24 @@ def run_jobs(client, jobs, output_dir, catalog=None, threshold=0.8, scope="drill
         manifest["catalog_sha256"] = hashlib.sha256(json.dumps(catalog, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     records = []
-    with (output_dir / "requests.jsonl").open("w") as log:
+    with (
+        (output_dir / "requests.jsonl").open("w", encoding="utf-8") as log,
+        (output_dir / "model_requests.jsonl").open("w", encoding="utf-8") as request_log,
+    ):
         for index, job in enumerate(jobs):
             print(f"{index + 1}/{len(jobs)} {job['experiment']} {job['id']}", flush=True)
             record = {k: v for k, v in job.items() if k != "body"}
+            # Save before dispatch so in-flight and interrupted calls remain inspectable.
+            outgoing = {
+                "logged_at": datetime.now(timezone.utc).isoformat(),
+                "id": job["id"], "experiment": job["experiment"],
+                "method": "POST", "url": client.base_url.rstrip("/") + "/v1/systemone",
+                "request": job["body"],
+            }
+            serialized = json.dumps(outgoing, ensure_ascii=False)
+            request_log.write(serialized + "\n")
+            request_log.flush()
+            print("Model request: " + serialized, flush=True)
             try:
                 record.update(client.infer(job["body"]))
                 if "spans" in job:

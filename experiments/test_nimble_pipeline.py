@@ -144,6 +144,43 @@ class ConstraintTests(unittest.TestCase):
         self.assertIsNone(report["provisional_candidate"])
         self.assertIn("вид самого товара", report["clarifying_question"])
 
+    def test_uncertain_product_alternative_does_not_block_supported_selection(self):
+        mechanical = deepcopy(self.catalog["positions"][0])
+        mechanical.update(key="mechanical@1", code="mechanical", name="Дрель ручная механическая", characteristics=[])
+        self.catalog["positions"].append(mechanical)
+        plan = pipeline.prepare(self.catalog, "Аккумуляторная дрель")
+        records = answer_jobs(plan)
+        for record in records:
+            if record.get("product_name") == mechanical["name"]:
+                record["response"]["answers"][record["id"]] = distribution("contradicted", ne.STATUSES, .7492505619293989)
+        report = pipeline.analyze(plan, records)
+        self.assertEqual(report["provisional_candidate"], "battery")
+        self.assertIn("Напряжение аккумулятора", report["clarifying_question"])
+        alternative = next(c for c in report["candidates"] if c["code"] == "mechanical")
+        self.assertEqual(alternative["assessment"], "uncertain")
+        self.assertTrue(alternative["compatible"])
+
+    def test_complete_supported_candidate_moves_to_review(self):
+        plan = pipeline.prepare(self.catalog, "Аккумуляторная дрель 18 В")
+        report = pipeline.analyze(plan, answer_jobs(plan))
+        self.assertEqual(report["status"], "ready_for_review")
+        self.assertIsNone(report["clarifying_question"])
+        self.assertIsNone(report["final_code"])
+
+    def test_clarification_uses_short_catalog_unit(self):
+        plan = pipeline.prepare(self.catalog, "Аккумуляторная дрель")
+        report = pipeline.analyze(plan, answer_jobs(plan))
+        self.assertEqual(report["clarifying_question"], "Укажите «Напряжение аккумулятора» (В).")
+
+    def test_unsupported_numeric_rule_cannot_produce_a_provisional_candidate(self):
+        rule = self.catalog["positions"][0]["characteristics"][1]["values"][0]["ranges"][0]
+        rule["maxMathNotation"] = "unrecognized"
+        plan = pipeline.prepare(self.catalog, "Аккумуляторная дрель 18 В")
+        report = pipeline.analyze(plan, answer_jobs(plan))
+        battery = next(c for c in report["candidates"] if c["code"] == "battery")
+        self.assertEqual(battery["assessment"], "uncertain")
+        self.assertIsNone(report["provisional_candidate"])
+
     def test_distinct_names_are_not_crowded_out_by_duplicate_versions(self):
         catalog = catalog_fixture()
         catalog["positions"] = []

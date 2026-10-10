@@ -4,14 +4,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from experiments import nimble_experiments as ne
-
 from backend.src.schemas import (
     AnalysisRequest,
+    AnalysisResponse,
     ErrorResponse,
     HealthResponse,
     ModelHealthResponse,
-    PipelineResponse,
+    PreviewResponse,
 )
 from backend.src.service import PipelineService
 
@@ -35,27 +34,23 @@ def health(service: PipelineDependency) -> HealthResponse:
     """Check the backend and loaded catalog without contacting the model."""
     return HealthResponse(
         status="ok",
-        catalog_positions=len(service.catalog["positions"]),
-        catalog_facts=len(service.catalog["facts"]),
         model_busy=service.model_lock.locked(),
-        model=ne.MODEL,
-        model_readiness="not_checked",
     )
 
 
 @router.get("/health/model", tags=["Health"], responses=MODEL_ERRORS)
 def model_health(service: PipelineDependency) -> ModelHealthResponse:
     """Probe Nimble separately with a timeout of at most five seconds."""
-    return ModelHealthResponse(status="ok", upstream=service.model_health())
+    return ModelHealthResponse(status="ok", model=service.model_health()["model"])
 
 
 @router.post("/preview", tags=["Pipeline"])
-def preview(body: AnalysisRequest, service: PipelineDependency) -> PipelineResponse:
+def preview(body: AnalysisRequest, service: PipelineDependency) -> PreviewResponse:
     """Prepare the shortlist and question counts; perform no inference or writes."""
     return service.preview(body)
 
 
-@router.post("/analyze", tags=["Pipeline"], responses=MODEL_ERRORS)
-def analyze(body: AnalysisRequest, service: PipelineDependency) -> PipelineResponse:
+@router.post("/analyze", tags=["Pipeline"], responses=MODEL_ERRORS, response_model_exclude_defaults=True)
+def analyze(body: AnalysisRequest, service: PipelineDependency) -> AnalysisResponse:
     """Run sequential model requests, check catalog constraints, and save evidence."""
     return service.analyze(body)
