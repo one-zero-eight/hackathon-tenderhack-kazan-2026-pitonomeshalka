@@ -74,3 +74,6 @@ services:
       languagetool:
         condition: service_started
     restart: unless-stopped
+
+volumes:
+  postgres_data:
