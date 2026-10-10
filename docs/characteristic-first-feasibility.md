@@ -1,0 +1,54 @@
+The characteristic-first approach is viable as a retrieval and validation experiment: build a vocabulary from the supplied catalogs, match the input to candidate facts, and use those facts to retrieve and rank KTRU positions. The data does not support guaranteeing a unique code from characteristics alone. Position names carry distinguishing information, numeric values need parsing, and some different codes have identical names and characteristic constraints.
+
+This assessment follows `data/task.pdf` and `data/notes.md`. It is based on a fresh scan of all 82 `all_actual` XML files and every row of the three workbooks. The 101 `not-actual` XML files were excluded. [Measurements and source examples](characteristic-first-audit.json) are reproducible with [scripts/audit_characteristic_matching.py](../scripts/audit_characteristic_matching.py). No model inference or extraction-quality benchmark was run.
+
+**Measured size of the problem.** Names below are normalized only by case, whitespace and ё → е. These are lexical names, not reviewed semantic concepts. ACTIVE specific positions exclude templates and deduplicate `(code, version)`; counts precede lifecycle/date review.
+
+| Source/subset | Positions or valid template rows | Distinct normalized characteristic names | Distinct categorical facts |
+|---|---:|---:|---:|
+| All actual-file KTRU records, including terminated records and templates | 81,465 positions | 15,522 | 51,852 |
+| ACTIVE, non-template KTRU | 54,190 positions | 14,928 | 48,315 |
+| Clothing/footwear, rubric 116, ACTIVE non-template | 922 positions | 160 | 822 |
+| Furniture, rubric 128, ACTIVE non-template | 190 positions | 388 | 936 |
+| Tools, code prefixes 25.73.* and 28.24.*, ACTIVE non-template | 190 positions | 319 | 820 |
+| Tools Excel templates | 41,074 rows | 18,573 | Not treated as a clean categorical vocabulary |
+| Furniture Excel templates | 42,318 rows | 18,850 | Not treated as a clean categorical vocabulary |
+| Clothing Excel templates | 22,793 rows | 8,023 | Not treated as a clean categorical vocabulary |
+
+A categorical fact is a normalized `(characteristic name, categorical value, OKEI code)` tuple. It is useful for estimating scoring work, but identical tuples in different product contexts are not automatically semantically interchangeable.
+
+The union of the three exploratory KTRU subsets has **839 names, 857 name/type/unit groupings, 2,568 categorical facts and 3,875 numeric rules**. These subsets are deliberately explicit and are not a complete reviewed mapping of the three workbook domains: measuring instruments, accessories, bags and other products can fall outside them. The median characteristics per position are 4 for clothing, 9 for furniture and 5 for the selected tools.
+
+The Excel templates have **43,219** names in their union. Combining them with ACTIVE specific KTRU gives **55,639** names. Only **2,508** Excel names exactly overlap with names in ACTIVE specific KTRU after the above normalization. This is lexical overlap, not an estimate of semantic coverage. Synonyms can still map, and matching names can have different meanings.
+
+**Why loading every Excel field as a clean enum will fail.** There are 467 structurally invalid template rows. Even structurally valid rows contain descriptive sentences in the property-name column. Examples include a complete description of a portable network tester (`Инструменты`, sheet 2, row 262), a shelving-unit construction description (`Мебель`, sheet 2, row 365), and a cap construction description (`Одежда`, sheet 2, row 2319). Some are legitimate complex requirements; they still need different treatment from a short reusable attribute such as width.
+
+The category `Столы письменные` alone has 1,870 distinct property names, and `Инструмент мерительный ручной` has 3,563. A category filter therefore does not by itself turn the Excel vocabulary into a small schema. Text and numeric fields also permit values that cannot be enumerated from the snapshot. Keep raw fields and provenance, prioritize clean reference definitions, and use observed STE text as supporting vocabulary rather than authoritative rules.
+
+The existing [relationship audit](../data/data-relationships.md) establishes that there is no supplied STE → KTRU or KPGZ → KTRU crosswalk. SPGZ characteristic IDs are not KTRU characteristic codes. These links must be inferred and reviewed; Excel cannot provide direct ground-truth KTRU labels.
+
+**Concrete cases supporting the approach and defining its limits.**
+
+1. Power supply distinguishes two drill positions. In `nsiKTRUNew_all_actual_20261003020003_065.xml`, `28.24.11.000-00000002` has `Тип питания = От аккумулятора`; `28.24.11.000-00000001` has `От сети`. Both are named `Дрель ручная электрическая`. Matching “аккумуляторная дрель” to the battery fact can distinguish this pair. That does not establish uniqueness across all products. The battery position has 14 characteristics and the mains position has 12.
+2. Characteristics can omit the key distinction. In `_060.xml`, `31.01.12.160-00000003` is `Стул на деревянном каркасе`, while `31.01.11.150-00000003` is `Стул на металлическом каркасе`. They share the same eight characteristic definitions and allowed values after removing IDs and ordering. Their frame material is distinguished in their names. Both are ACTIVE and have application start dates before 2026-10-10. Include position-name meaning as evidence, with provenance separate from explicitly listed characteristics.
+3. Even the name and all constraints can tie. `25.73.40.110-00000001` in `_072.xml` and `25.73.40.110-00003` in `_080.xml` are both `Сверло центровочное`, with identical normalized characteristic constraints. Both are ACTIVE with application start 2025-09-04. A model cannot recover a distinction absent from these fields; inspect remaining metadata or return multiple candidates. Do not silently merge these codes.
+4. Empty constraints are real. There are 7,830 ACTIVE non-template positions with no characteristics across the snapshot; the selected clothing, furniture and tool subsets contain 25, 3 and 17 respectively. An empty schema must not win merely because it has no contradictions.
+
+For the selected domains, respectively 46 clothing, 8 furniture and 8 tool positions belong to groups with identical nonempty characteristic constraints. Fingerprints preserve characteristic type, units, kind, required flags and value rules, but ignore identifiers and ordering. They do not compare all other position metadata. Four clothing and eight tool positions also share the same normalized name within these groups.
+
+**Recommended experiment.** Keep the full catalog vocabulary in an offline index. A property-first online path can run without forcing an early category decision:
+
+1. Preserve input spans and extract numeric expressions, comparison operators, units and negation. Retrieve possible characteristic/value facts from the full vocabulary using wording and aliases. In parallel retrieve product-name evidence; use it to distinguish objects and parts such as frame, seat and packaging.
+2. Use Jev to judge whether the input supports each shortlisted categorical fact or candidate numeric-value binding. Score facts independently; several can be true. Preserve supported, contradicted and unspecified states. Calibrate acceptance thresholds on reviewed examples; a forced argmax is not evidence that any candidate is supported.
+3. Look up the KTRU positions attached to those facts using an inverted index. Include candidates suggested by product-name evidence so descriptions with sparse or unfamiliar characteristics can still retrieve the correct family.
+4. For these candidates, resolve remaining characteristics in context. Convert compatible units and evaluate numeric bounds deterministically, preserving inclusive/exclusive boundaries. A user number is not a catalog enum: extract `120 см`, normalize it, then test the applicable intervals.
+5. Rank by object relevance and informative supported facts; penalize reliable contradictions. Discount generic facts such as material or color that apply to many product families. Missing evidence is unknown, not false. Avoid raw match-count ranking, which favors long schemas.
+6. Keep unmatched facts as extras with their original evidence. A missing KTRU characteristic does not automatically invalidate the product. Respect the selected position's additional-characteristic flag. If several candidates remain, ask about a fact that separates their names or constraints; if no such fact is available, expose the tie.
+
+Maintain source-specific identities for `(position code, version, characteristic code, value ordinal)`. Global aliases should point back to these source records. Name/type/unit groupings are a retrieval optimization, not a license to merge meanings. The imported catalog must also retain status, template flags, dates and provenance. Future `applicationDateStart` is a review flag, not a reason to guess lifecycle semantics.
+
+For a first model experiment, test all categorical facts within one small family, then compare that exhaustive family baseline with retrieval plus Jev. The selected three-domain union is also feasible for an offline exhaustive baseline (2,568 categorical hypotheses per input before adding object context), but interactive V100 latency remains unmeasured. A shortlist of 50–200 hypotheses is a starting experiment parameter, not a promised recall or latency target. The full combined vocabulary requires at least 55,639 name checks per input if scanned naively, before testing values.
+
+For AlexWortega/openjev, the primitive is pairwise entailment scoring: input as premise, candidate fact as hypothesis. Its documented [implementation](https://huggingface.co/AlexWortega/openjev/blob/main/code/modeling_openjev.py) supports this use. The proposed workflow does not need an action/tool-call loop: application code can assemble results directly. Unknown numerical or text values still need candidate extraction; scoring catalog options cannot create values absent from them.
+
+**What to measure before committing to the architecture.** Build a reviewed set of roughly 100 descriptions spanning clear matches, missing information, negation, numeric ranges, typos, contradictions, extras, ambiguous codes and unsupported products. The 299,986 supplied STE rows are realistic inputs but have no verified KTRU labels; do not report them as a labeled test set. Measure candidate-fact recall before Jev, accepted-fact precision/recall, KTRU recall@k, final-code accuracy on unambiguous cases, correct abstention/ties, and cold/warm latency plus peak VRAM. Keep numeric and categorical results separate. The catalog audit demonstrates that this is a viable design to test; it does not establish model accuracy or interactive performance.

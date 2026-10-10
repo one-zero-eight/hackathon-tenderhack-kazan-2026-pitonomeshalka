@@ -1,0 +1,1284 @@
+{
+  "scope_note": "all_actual includes terminated/templates; other groups deduplicate ACTIVE non-template (code,version), before lifecycle/date review. Rubrics and tool prefixes are explicit exploratory subsets, not a complete reviewed domain mapping. Constraint fingerprints ignore identifiers/order and normalize case/whitespace/ё, but retain units, types, kind, required and value rules. Fingerprint comparisons are not computed for all_actual_records; name/type/unit keys are lexical grouping keys, not proven semantic equivalence.",
+  "ktru": {
+    "all_actual_records": {
+      "positions": 81465,
+      "characteristic_occurrences": 330548,
+      "value_occurrences": 1067572,
+      "normalized_names": 15522,
+      "name_type_units_definitions": 15885,
+      "unique_categorical_facts": 51852,
+      "unique_numeric_rules": 60708,
+      "without_characteristics": 9742,
+      "no_new_features": 1558,
+      "characteristics_per_position": {
+        "median": 3,
+        "p95": 9,
+        "max": 300
+      },
+      "top_names": [
+        [
+          "назначение",
+          12230
+        ],
+        [
+          "длина",
+          10225
+        ],
+        [
+          "материал",
+          8076
+        ],
+        [
+          "толщина",
+          7021
+        ],
+        [
+          "ширина",
+          6154
+        ],
+        [
+          "количество выполняемых тестов",
+          5844
+        ],
+        [
+          "высота",
+          4735
+        ],
+        [
+          "анатомическая форма",
+          4234
+        ],
+        [
+          "мртсовместимость",
+          4161
+        ],
+        [
+          "диаметр",
+          3937
+        ],
+        [
+          "медиолатеральный размер",
+          3245
+        ],
+        [
+          "переднезадний размер",
+          3245
+        ]
+      ],
+      "codes_with_multiple_normalized_names": 338,
+      "names_with_multiple_nonempty_unit_codes": 185,
+      "duplicate_nonempty_constraint_groups": null,
+      "positions_in_duplicate_nonempty_constraint_groups": null,
+      "same_name_and_constraints_groups": null,
+      "same_name_and_constraints_positions": null,
+      "same_name_and_constraints_examples": null,
+      "constraint_collision_examples": null,
+      "date_flags": {
+        "start_after_2026_10_10": 3098,
+        "end_before_2026_10_10": 34
+      }
+    },
+    "active_specific": {
+      "positions": 54190,
+      "characteristic_occurrences": 204476,
+      "value_occurrences": 529841,
+      "normalized_names": 14928,
+      "name_type_units_definitions": 15262,
+      "unique_categorical_facts": 48315,
+      "unique_numeric_rules": 57503,
+      "without_characteristics": 7830,
+      "no_new_features": 474,
+      "characteristics_per_position": {
+        "median": 3.0,
+        "p95": 9,
+        "max": 274
+      },
+      "top_names": [
+        [
+          "назначение",
+          9079
+        ],
+        [
+          "длина",
+          7127
+        ],
+        [
+          "материал",
+          5817
+        ],
+        [
+          "количество выполняемых тестов",
+          4480
+        ],
+        [
+          "ширина",
+          3595
+        ],
+        [
+          "мртсовместимость",
+          2977
+        ],
+        [
+          "толщина",
+          2677
+        ],
+        [
+          "исполнение",
+          2515
+        ],
+        [
+          "диаметр",
+          2429
+        ],
+        [
+          "высота",
+          2278
+        ],
+        [
+          "тип",
+          2268
+        ],
+        [
+          "длина перешейка",
+          2134
+        ]
+      ],
+      "codes_with_multiple_normalized_names": 6,
+      "names_with_multiple_nonempty_unit_codes": 174,
+      "duplicate_nonempty_constraint_groups": 2130,
+      "positions_in_duplicate_nonempty_constraint_groups": 9929,
+      "same_name_and_constraints_groups": 936,
+      "same_name_and_constraints_positions": 2254,
+      "same_name_and_constraints_examples": [
+        [
+          [
+            "32.50.13.110-00071",
+            "Катетер баллонный для коронарной ангиопластики, режущий"
+          ],
+          [
+            "32.50.13.110-01349",
+            "Катетер баллонный для коронарной ангиопластики, режущий"
+          ]
+        ],
+        [
+          [
+            "32.50.13.190-00233",
+            "Набор для системы размораживания эритроцитов донорской крови"
+          ],
+          [
+            "32.50.13.190-00227",
+            "Набор для системы размораживания эритроцитов донорской крови"
+          ]
+        ],
+        [
+          [
+            "32.50.13.110-00774",
+            "Канюля для искусственного кровообращения, бедренная"
+          ],
+          [
+            "32.50.13.110-00770",
+            "Канюля для искусственного кровообращения, бедренная"
+          ]
+        ],
+        [
+          [
+            "32.50.13.110-01728",
+            "Канюля для искусственного кровообращения, венозная"
+          ],
+          [
+            "32.50.13.110-01723",
+            "Канюля для искусственного кровообращения, венозная"
+          ]
+        ],
+        [
+          [
+            "32.50.13.110-01683",
+            "Канюля для искусственного кровообращения, венозная"
+          ],
+          [
+            "32.50.13.110-01822",
+            "Канюля для искусственного кровообращения, венозная"
+          ]
+        ]
+      ],
+      "constraint_collision_examples": [
+        [
+          [
+            "32.50.13.110-00071",
+            "Катетер баллонный для коронарной ангиопластики, режущий"
+          ],
+          [
+            "32.50.13.110-01349",
+            "Катетер баллонный для коронарной ангиопластики, режущий"
+          ]
+        ],
+        [
+          [
+            "32.50.13.190-00233",
+            "Набор для системы размораживания эритроцитов донорской крови"
+          ],
+          [
+            "32.50.13.190-00227",
+            "Набор для системы размораживания эритроцитов донорской крови"
+          ]
+        ],
+        [
+          [
+            "32.50.13.110-00774",
+            "Канюля для искусственного кровообращения, бедренная"
+          ],
+          [
+            "32.50.13.110-00770",
+            "Канюля для искусственного кровообращения, бедренная"
+          ]
+        ]
+      ],
+      "date_flags": {
+        "start_after_2026_10_10": 2858,
+        "end_before_2026_10_10": 0
+      }
+    },
+    "clothing_rubric_116": {
+      "positions": 922,
+      "characteristic_occurrences": 4105,
+      "value_occurrences": 20347,
+      "normalized_names": 160,
+      "name_type_units_definitions": 166,
+      "unique_categorical_facts": 822,
+      "unique_numeric_rules": 444,
+      "without_characteristics": 25,
+      "no_new_features": 0,
+      "characteristics_per_position": {
+        "median": 4.0,
+        "p95": 9,
+        "max": 14
+      },
+      "top_names": [
+        [
+          "вид одежды",
+          412
+        ],
+        [
+          "половой признак",
+          367
+        ],
+        [
+          "половая принадлежность",
+          348
+        ],
+        [
+          "размер (штихмассовый)",
+          253
+        ],
+        [
+          "класс защиты одежды",
+          190
+        ],
+        [
+          "материал верха",
+          122
+        ],
+        [
+          "по высоте заготовки верха",
+          120
+        ],
+        [
+          "материал подкладки",
+          98
+        ],
+        [
+          "материал подошвы",
+          98
+        ],
+        [
+          "вид застежки",
+          96
+        ],
+        [
+          "наличие каблука",
+          96
+        ],
+        [
+          "класс защиты одежды в зависимости от запыленности воздуха рабочей зоны, мг/куб.м",
+          80
+        ]
+      ],
+      "codes_with_multiple_normalized_names": 0,
+      "names_with_multiple_nonempty_unit_codes": 0,
+      "duplicate_nonempty_constraint_groups": 23,
+      "positions_in_duplicate_nonempty_constraint_groups": 46,
+      "same_name_and_constraints_groups": 2,
+      "same_name_and_constraints_positions": 4,
+      "same_name_and_constraints_examples": [
+        [
+          [
+            "14.12.20.000-00000004",
+            "Одежда санитарная женская"
+          ],
+          [
+            "14.12.20.000-00000003",
+            "Одежда санитарная женская"
+          ]
+        ],
+        [
+          [
+            "14.12.10.000-00000004",
+            "Одежда санитарная мужская"
+          ],
+          [
+            "14.12.10.000-00000003",
+            "Одежда санитарная мужская"
+          ]
+        ]
+      ],
+      "constraint_collision_examples": [
+        [
+          [
+            "15.20.32.124-00000006",
+            "Обувь специальная кожаная для защиты от повышенных температур"
+          ],
+          [
+            "15.20.32.125-00000010",
+            "Обувь специальная кожаная для защиты от скольжения по зажиренным поверхностям"
+          ]
+        ],
+        [
+          [
+            "15.20.32.124-00000005",
+            "Обувь специальная кожаная для защиты от повышенных температур"
+          ],
+          [
+            "15.20.32.125-00000009",
+            "Обувь специальная кожаная для защиты от скольжения по зажиренным поверхностям"
+          ]
+        ],
+        [
+          [
+            "15.20.32.124-00000004",
+            "Обувь специальная кожаная для защиты от повышенных температур"
+          ],
+          [
+            "15.20.32.125-00000008",
+            "Обувь специальная кожаная для защиты от скольжения по зажиренным поверхностям"
+          ]
+        ]
+      ],
+      "date_flags": {
+        "start_after_2026_10_10": 28,
+        "end_before_2026_10_10": 0
+      }
+    },
+    "furniture_rubric_128": {
+      "positions": 190,
+      "characteristic_occurrences": 1754,
+      "value_occurrences": 8119,
+      "normalized_names": 388,
+      "name_type_units_definitions": 396,
+      "unique_categorical_facts": 936,
+      "unique_numeric_rules": 1737,
+      "without_characteristics": 3,
+      "no_new_features": 0,
+      "characteristics_per_position": {
+        "median": 9.0,
+        "p95": 15,
+        "max": 27
+      },
+      "top_names": [
+        [
+          "тип каркаса",
+          85
+        ],
+        [
+          "вид материала столешницы",
+          43
+        ],
+        [
+          "количество выдвижных ящиков",
+          42
+        ],
+        [
+          "высота",
+          41
+        ],
+        [
+          "длина",
+          34
+        ],
+        [
+          "тип напольной опоры",
+          34
+        ],
+        [
+          "регулировка по высоте",
+          32
+        ],
+        [
+          "глубина",
+          29
+        ],
+        [
+          "ростовая группа",
+          24
+        ],
+        [
+          "ширина",
+          23
+        ],
+        [
+          "вид материала корпуса",
+          23
+        ],
+        [
+          "наличие колесных опор",
+          21
+        ]
+      ],
+      "codes_with_multiple_normalized_names": 0,
+      "names_with_multiple_nonempty_unit_codes": 6,
+      "duplicate_nonempty_constraint_groups": 4,
+      "positions_in_duplicate_nonempty_constraint_groups": 8,
+      "same_name_and_constraints_groups": 0,
+      "same_name_and_constraints_positions": 0,
+      "same_name_and_constraints_examples": [],
+      "constraint_collision_examples": [
+        [
+          [
+            "31.01.12.160-00000003",
+            "Стул на деревянном каркасе"
+          ],
+          [
+            "31.01.11.150-00000003",
+            "Стул на металлическом каркасе"
+          ]
+        ],
+        [
+          [
+            "31.01.12.160-00000002",
+            "Стул на деревянном каркасе"
+          ],
+          [
+            "31.01.11.150-00000002",
+            "Стул на металлическом каркасе"
+          ]
+        ],
+        [
+          [
+            "31.01.12.160-00000001",
+            "Стул на деревянном каркасе"
+          ],
+          [
+            "31.01.11.150-00000001",
+            "Стул на металлическом каркасе"
+          ]
+        ]
+      ],
+      "date_flags": {
+        "start_after_2026_10_10": 29,
+        "end_before_2026_10_10": 0
+      }
+    },
+    "tools_prefix_25.73_or_28.24": {
+      "positions": 190,
+      "characteristic_occurrences": 1141,
+      "value_occurrences": 5788,
+      "normalized_names": 319,
+      "name_type_units_definitions": 322,
+      "unique_categorical_facts": 820,
+      "unique_numeric_rules": 1709,
+      "without_characteristics": 17,
+      "no_new_features": 0,
+      "characteristics_per_position": {
+        "median": 5.0,
+        "p95": 12,
+        "max": 16
+      },
+      "top_names": [
+        [
+          "тип",
+          48
+        ],
+        [
+          "длина",
+          46
+        ],
+        [
+          "тип питания",
+          29
+        ],
+        [
+          "исполнение",
+          28
+        ],
+        [
+          "мощность",
+          25
+        ],
+        [
+          "режущие кромки",
+          18
+        ],
+        [
+          "изогнутая рабочая часть",
+          18
+        ],
+        [
+          "вид пассатижей",
+          18
+        ],
+        [
+          "вид",
+          16
+        ],
+        [
+          "материал корпуса",
+          14
+        ],
+        [
+          "емкость аккумулятора",
+          12
+        ],
+        [
+          "скорость",
+          12
+        ]
+      ],
+      "codes_with_multiple_normalized_names": 0,
+      "names_with_multiple_nonempty_unit_codes": 1,
+      "duplicate_nonempty_constraint_groups": 4,
+      "positions_in_duplicate_nonempty_constraint_groups": 8,
+      "same_name_and_constraints_groups": 4,
+      "same_name_and_constraints_positions": 8,
+      "same_name_and_constraints_examples": [
+        [
+          [
+            "25.73.40.110-00000001",
+            "Сверло центровочное"
+          ],
+          [
+            "25.73.40.110-00003",
+            "Сверло центровочное"
+          ]
+        ],
+        [
+          [
+            "25.73.30.210-00000003",
+            "Стамеска"
+          ],
+          [
+            "25.73.30.210-00007",
+            "Стамеска"
+          ]
+        ],
+        [
+          [
+            "25.73.30.210-00000001",
+            "Стамеска"
+          ],
+          [
+            "25.73.30.210-00000008",
+            "Стамеска"
+          ]
+        ],
+        [
+          [
+            "25.73.30.144-00000001",
+            "Клеймо ударное"
+          ],
+          [
+            "25.73.30.144-00000003",
+            "Клеймо ударное"
+          ]
+        ]
+      ],
+      "constraint_collision_examples": [
+        [
+          [
+            "25.73.40.110-00000001",
+            "Сверло центровочное"
+          ],
+          [
+            "25.73.40.110-00003",
+            "Сверло центровочное"
+          ]
+        ],
+        [
+          [
+            "25.73.30.210-00000003",
+            "Стамеска"
+          ],
+          [
+            "25.73.30.210-00007",
+            "Стамеска"
+          ]
+        ],
+        [
+          [
+            "25.73.30.210-00000001",
+            "Стамеска"
+          ],
+          [
+            "25.73.30.210-00000008",
+            "Стамеска"
+          ]
+        ]
+      ],
+      "date_flags": {
+        "start_after_2026_10_10": 18,
+        "end_before_2026_10_10": 0
+      }
+    }
+  },
+  "examples": [
+    {
+      "code": "14.11.10.000-00000001",
+      "version": "9",
+      "name": "Одежда из натуральной или композиционной кожи",
+      "file": "nsiKTRUNew_all_actual_20261003020003_020.xml",
+      "noNewFeatures": "false",
+      "chars": []
+    },
+    {
+      "code": "14.12.10.000-00000001",
+      "version": "11",
+      "name": "Спецодежда мужская",
+      "file": "nsiKTRUNew_all_actual_20261003020003_020.xml",
+      "noNewFeatures": "false",
+      "chars": []
+    },
+    {
+      "code": "14.12.10.000-00000002",
+      "version": "11",
+      "name": "Спецодежда мужская",
+      "file": "nsiKTRUNew_all_actual_20261003020003_020.xml",
+      "noNewFeatures": "false",
+      "chars": []
+    },
+    {
+      "code": "14.12.20.000-00000002",
+      "version": "10",
+      "name": "Спецодежда женская",
+      "file": "nsiKTRUNew_all_actual_20261003020003_020.xml",
+      "noNewFeatures": "false",
+      "chars": []
+    },
+    {
+      "code": "14.12.20.000-00000001",
+      "version": "10",
+      "name": "Спецодежда женская",
+      "file": "nsiKTRUNew_all_actual_20261003020003_020.xml",
+      "noNewFeatures": "false",
+      "chars": []
+    },
+    {
+      "code": "14.13.10.000-00000002",
+      "version": "9",
+      "name": "Одежда верхняя трикотажная или вязаная",
+      "file": "nsiKTRUNew_all_actual_20261003020003_020.xml",
+      "noNewFeatures": "false",
+      "chars": []
+    },
+    {
+      "code": "14.13.10.000-00000001",
+      "version": "9",
+      "name": "Одежда верхняя трикотажная или вязаная",
+      "file": "nsiKTRUNew_all_actual_20261003020003_020.xml",
+      "noNewFeatures": "false",
+      "chars": []
+    },
+    {
+      "code": "14.13.20.000-00000002",
+      "version": "9",
+      "name": "Одежда верхняя прочая мужская или для мальчиков",
+      "file": "nsiKTRUNew_all_actual_20261003020003_020.xml",
+      "noNewFeatures": "false",
+      "chars": []
+    },
+    {
+      "code": "28.24.11.000-00000002",
+      "version": "4",
+      "name": "Дрель ручная электрическая",
+      "file": "nsiKTRUNew_all_actual_20261003020003_065.xml",
+      "noNewFeatures": "false",
+      "chars": [
+        {
+          "name": "Тип питания",
+          "kind": "1",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>ef042bb9-8</ns0:valueCode>\n                        <ns0:qualityDescription>От аккумулятора</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Минимальный диаметр зажима патрона",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>35a2602b-6</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>0.5</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>0baa7685-d</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>0.5</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>9ec6f188-0</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1.5</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>d8f3f907-9</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1.5</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>2</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>30cc5621-f</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>2</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>3</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>03e6ee4b-b</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>3</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Максимальный диаметр зажима патрона",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>6444e86f-1</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>12</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>14</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>cd2e5c28-8</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>14</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>16</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a69d1957-d</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>16</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>df303164-4</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>6</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a2002b52-e</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>6</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>8</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>3109b5e1-5</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>8</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>10</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>09f8d3ac-a</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>10</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>12</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Максимальное количество оборотов",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>e79d3c32-6</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>25000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>30000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>97b72545-2</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>500</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>e9b41a18-8</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>500</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>beb3eeac-6</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1500</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>877b3d70-a</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1500</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>2000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>0c334912-1</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>2000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>2500</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a06ca826-a</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>2500</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>3000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>650fbc7c-c</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>3000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>5000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>761ba7d2-f</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>5000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>10000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>ed1beaf1-1</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>10000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>15000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>b281364b-d</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>15000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>20000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>db225e68-f</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>20000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>25000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>ab878209-2</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>30000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>35000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>34856a71-e</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>35000</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Количество аккумуляторов в комплекте, шт",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>62764965-4</ns0:valueCode>\n                        <ns0:qualityDescription>Отсутствует</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>fbfc8326-6</ns0:valueCode>\n                        <ns0:qualityDescription>1</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>52e0b912-2</ns0:valueCode>\n                        <ns0:qualityDescription>2</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Емкость аккумулятора",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>2ec29b92-0</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>263</ns0:code>\n                            <ns0:name>Ампер-час (3,6 кКл)</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>2</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>1a654074-3</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>263</ns0:code>\n                            <ns0:name>Ампер-час (3,6 кКл)</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>2</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>4</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>de1f56fa-c</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>263</ns0:code>\n                            <ns0:name>Ампер-час (3,6 кКл)</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>4</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>6</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>9ebb6f07-5</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>263</ns0:code>\n                            <ns0:name>Ампер-час (3,6 кКл)</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>6</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>8</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>6aa04d9a-0</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>263</ns0:code>\n                            <ns0:name>Ампер-час (3,6 кКл)</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>8</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>10</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>c7cdf9c2-c</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>263</ns0:code>\n                            <ns0:name>Ампер-час (3,6 кКл)</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>10</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Тип патрона",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>00bafbc6-2</ns0:valueCode>\n                        <ns0:qualityDescription>Ключевой</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>be0368ab-9</ns0:valueCode>\n                        <ns0:qualityDescription>Быстрозажимной одномуфтовый</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a41da6f9-2</ns0:valueCode>\n                        <ns0:qualityDescription>Быстрозажимной двухмуфтовый</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие режима реверса",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>911d6686-d</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>7def3b98-5</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие режима ударного сверления",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>0b9030a4-a</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>b37ecd8a-2</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие режима регулировки оборотов",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>049eb153-1</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>caa2564f-d</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие функции блокировки кнопки старта",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>818b6b88-6</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>cf385ecc-a</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Тип конструкции",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>1ec8ab88-e</ns0:valueCode>\n                        <ns0:qualityDescription>Обычная</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>d3882df4-8</ns0:valueCode>\n                        <ns0:qualityDescription>Угловая</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие рукоятки-упора",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>8b905a8b-4</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>25da2080-1</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Напряжение аккумулятора",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a1b99988-b</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>222</ns0:code>\n                            <ns0:name>Вольт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>3</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>ca4eac1e-c</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>222</ns0:code>\n                            <ns0:name>Вольт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>3</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>5</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>c8a18af1-6</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>222</ns0:code>\n                            <ns0:name>Вольт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>5</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>10</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>c4845601-a</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>222</ns0:code>\n                            <ns0:name>Вольт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>10</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>15</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>397d9beb-1</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>222</ns0:code>\n                            <ns0:name>Вольт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>15</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>20</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>7ee4c41f-4</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>222</ns0:code>\n                            <ns0:name>Вольт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>20</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>30</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>894ba460-1</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>222</ns0:code>\n                            <ns0:name>Вольт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>30</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>40</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>dd5fb41c-c</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>222</ns0:code>\n                            <ns0:name>Вольт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>40</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        }
+      ]
+    },
+    {
+      "code": "28.24.11.000-00000001",
+      "version": "5",
+      "name": "Дрель ручная электрическая",
+      "file": "nsiKTRUNew_all_actual_20261003020003_065.xml",
+      "noNewFeatures": "false",
+      "chars": [
+        {
+          "name": "Тип питания",
+          "kind": "1",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>33f3873f-1</ns0:valueCode>\n                        <ns0:qualityDescription>От сети</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Минимальный диаметр зажима патрона",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>35a2602b-6</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>0.5</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>0baa7685-d</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>0.5</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>9ec6f188-0</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1.5</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>d8f3f907-9</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1.5</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>2</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>30cc5621-f</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>2</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>3</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>03e6ee4b-b</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>3</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Максимальный диаметр зажима патрона",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>6444e86f-1</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>12</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>14</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>cd2e5c28-8</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>14</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>16</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a69d1957-d</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>16</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>df303164-4</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>6</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a2002b52-e</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>6</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>8</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>3109b5e1-5</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>8</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>10</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>09f8d3ac-a</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>003</ns0:code>\n                            <ns0:name>Миллиметр</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>10</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>12</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Мощность",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>2d5c138d-5</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>212</ns0:code>\n                            <ns0:name>Ватт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>500</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>089cd6e9-4</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>212</ns0:code>\n                            <ns0:name>Ватт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>500</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>750</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>91f79dcf-a</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>212</ns0:code>\n                            <ns0:name>Ватт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>750</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>90375fcc-4</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>212</ns0:code>\n                            <ns0:name>Ватт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1250</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>69d26442-5</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>212</ns0:code>\n                            <ns0:name>Ватт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1250</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1500</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>8bad5f61-5</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>212</ns0:code>\n                            <ns0:name>Ватт</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1500</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Максимальное количество оборотов",
+          "kind": "2",
+          "required": "true",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>e79d3c32-6</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>25000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>30000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>97b72545-2</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>500</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>e9b41a18-8</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>500</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>beb3eeac-6</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>1500</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>877b3d70-a</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>1500</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>2000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>0c334912-1</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>2000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>2500</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a06ca826-a</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>2500</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>3000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>650fbc7c-c</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>3000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>5000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>761ba7d2-f</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>5000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>10000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>ed1beaf1-1</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>10000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>15000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>b281364b-d</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>15000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>20000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>db225e68-f</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>20000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>25000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>ab878209-2</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>30000</ns0:min>\n                                <ns0:maxMathNotation>less</ns0:maxMathNotation>\n                                <ns0:max>35000</ns0:max>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>34856a71-e</ns0:valueCode>\n                        <ns0:OKEI>\n                            <ns0:code>331</ns0:code>\n                            <ns0:name>Оборот в минуту</ns0:name>\n                        </ns0:OKEI>\n                        <ns0:valueFormat>N</ns0:valueFormat>\n                        <ns0:rangeSet>\n                            <ns0:valueRange>\n                                <ns0:minMathNotation>greaterOrEqual</ns0:minMathNotation>\n                                <ns0:min>35000</ns0:min>\n                            </ns0:valueRange>\n                        </ns0:rangeSet>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Тип патрона",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>00bafbc6-2</ns0:valueCode>\n                        <ns0:qualityDescription>Ключевой</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>be0368ab-9</ns0:valueCode>\n                        <ns0:qualityDescription>Быстрозажимной одномуфтовый</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>a41da6f9-2</ns0:valueCode>\n                        <ns0:qualityDescription>Быстрозажимной двухмуфтовый</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие режима реверса",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>911d6686-d</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>7def3b98-5</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие режима ударного сверления",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>0b9030a4-a</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>b37ecd8a-2</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие режима регулировки оборотов",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>049eb153-1</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>caa2564f-d</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие функции блокировки кнопки старта",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>818b6b88-6</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>cf385ecc-a</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Тип конструкции",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>1ec8ab88-e</ns0:valueCode>\n                        <ns0:qualityDescription>Обычная</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>d3882df4-8</ns0:valueCode>\n                        <ns0:qualityDescription>Угловая</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        },
+        {
+          "name": "Наличие рукоятки-упора",
+          "kind": "2",
+          "required": "false",
+          "values": [
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>8b905a8b-4</ns0:valueCode>\n                        <ns0:qualityDescription>Да</ns0:qualityDescription>\n                    </ns0:value>\n                    ",
+            "<ns0:value xmlns:ns0=\"http://zakupki.gov.ru/oos/types/1\">\n                        <ns0:valueCode>25da2080-1</ns0:valueCode>\n                        <ns0:qualityDescription>Нет</ns0:qualityDescription>\n                    </ns0:value>\n                "
+          ]
+        }
+      ]
+    }
+  ],
+  "workbooks": {
+    "Инструменты": {
+      "ste_rows": 99998,
+      "template_rows": 41352,
+      "valid_rows": 41074,
+      "invalid_rows": 278,
+      "raw_names": 18746,
+      "normalized_names": 18573,
+      "name_type_unit_definitions": 22180,
+      "raw_pipe_split_value_candidates": 16626,
+      "types": {
+        "справочник": 3639,
+        "признак": 3912,
+        "целое числовое значение": 10780,
+        "текст": 16733,
+        "дробное числовое значение": 6009,
+        "диапазон": 1
+      },
+      "categories": 278,
+      "properties_per_category": {
+        "median": 79.0,
+        "max": 3563
+      },
+      "name_overlap_all_ktru": 1665,
+      "name_overlap_active_specific": 1643,
+      "ste_samples": [
+        {
+          "row": 2,
+          "id": "1160207",
+          "name": "Дрель-шуруповерт аккумуляторная Ставр \"ДА-10,8/2 (2,6 Л)\"",
+          "characteristics": "Вес 2.03000 кг | Высота упаковки 100 мм | Глубина упаковки 330 мм | Диаметр сверления (металл) 6 мм | Дополнительные функции Блокировка шпинделя,Блокировка от случайного включения,Бесступенчатая регулировка частоты вращения | Комплектация Дрель-шуруповерт, зарядное устройство, 6 сверл, 6 бит, переходник для бит, аккумулятор, пластиковый кейс | Конструктивные особенности Рукоятки с резиновым покрытием,Защитный кожух,Индикатор заряда аккумулятора | Максимальные обороты на 1ой скорости 350 об/мин | Максимальные обороты на 2ой скорости 1300 об/мин | Максимальный диаметр зажима патрона 0.00000 мм | Максимальный диаметр сверления (дерево) 20 мм | Мощность 10.80000 Вт | Режимы работы Завинчивание,Сверление | Тип Шуруповерт,Дрель-шуруповерт | Тип патрона Быстрозажимной | Тип питания Встроенный аккумулятор | Цвет серый, черный, красный | Ширина упаковки 250.00000 мм"
+        },
+        {
+          "row": 3,
+          "id": "1160208",
+          "name": "Шуруповерт Bosch PSR 14.4 (0603955420)",
+          "characteristics": "Вес 3.10000 кг | Высота упаковки 80 мм | Дополнительные функции Реверс | Комплектация зарядное устройство, аккумулятор x1, кейс, быстрозажимной патрон | Макс. диаметр завинчиваемых шурупов (не задано) мм | Максимальные обороты на 1ой скорости 700 об/мин | Максимальный диаметр зажима патрона 0.00000 мм | Максимальный крутящий момент (Нм) 0.00000 | Режимы работы Завинчивание,Сверление | Тип инструмента Шуруповерт | Тип питания Сменный аккумулятор | Цвет Зеленый-Черный | Ширина упаковки 250.00000 мм"
+        }
+      ],
+      "largest_categories": [
+        {
+          "code": "01.11.02.03.02",
+          "name": "Инструмент мерительный ручной",
+          "names": 3563
+        },
+        {
+          "code": "01.11.02.02.06",
+          "name": "Наборы строительных инструментов",
+          "names": 1512
+        },
+        {
+          "code": "01.11.02.11.01",
+          "name": "Комплектующие (запасные части) к ручному электрическому инструменту строительному",
+          "names": 849
+        }
+      ],
+      "long_property_name_examples": [
+        {
+          "row": 3,
+          "name": "Виды товаров информационно-технологических, средств связи, оргтехники, электроники (включая программное обеспечение)",
+          "type": "Справочник",
+          "unit": ""
+        },
+        {
+          "row": 4,
+          "name": "Виды приборов и инструментов для технического обслуживания и ремонта информационно-технологического оборудования и оргтехники",
+          "type": "Справочник",
+          "unit": ""
+        },
+        {
+          "row": 262,
+          "name": "Портативный тестер-анализатор беркут-etx для анализа  локальных сетей и магистральных каналов связи со скоростью передачи  данных от 10 мбит/c до 10 гбит/с.",
+          "type": "Текст",
+          "unit": ""
+        },
+        {
+          "row": 263,
+          "name": "Поддерживает технологию q-in-q (vlan stacking) и многопротокольную коммутацию по меткам: до 3-х vlan меток с возможностью задания приоритета vlan и vlan id и до 3-х mpls меток",
+          "type": "Текст",
+          "unit": ""
+        },
+        {
+          "row": 1720,
+          "name": "Ударный механизм молотка без газового аккумулятора, не требует дополнительной заправки инертным газом",
+          "type": "Целое числовое значение",
+          "unit": "шт"
+        }
+      ]
+    },
+    "Мебель": {
+      "ste_rows": 99995,
+      "template_rows": 42395,
+      "valid_rows": 42318,
+      "invalid_rows": 77,
+      "raw_names": 19103,
+      "normalized_names": 18850,
+      "name_type_unit_definitions": 21358,
+      "raw_pipe_split_value_candidates": 18808,
+      "types": {
+        "справочник": 4264,
+        "целое числовое значение": 11440,
+        "текст": 17878,
+        "признак": 4182,
+        "дробное числовое значение": 4554
+      },
+      "categories": 139,
+      "properties_per_category": {
+        "median": 186,
+        "max": 1870
+      },
+      "name_overlap_all_ktru": 1099,
+      "name_overlap_active_specific": 1081,
+      "ste_samples": [
+        {
+          "row": 2,
+          "id": "1193874",
+          "name": "Стойка для рекламных материалов напольная, сетчатая, на 32 лотка, вращающаяся, белая",
+          "characteristics": "Масса 10.20000 кг | Тип стойка"
+        },
+        {
+          "row": 3,
+          "id": "1202787",
+          "name": "Шкаф металлический для документов КБС-011Т, 660х420х350 мм, 19 кг, сварной",
+          "characteristics": "Высота шкафа до 90 см | Кассовое отделение Да | Кол-во отделений 1 | Кол-во полок 2 | Кострукция сварная | Масса 26 г | Ширина шкафа до 50 см"
+        }
+      ],
+      "largest_categories": [
+        {
+          "code": "01.16.03.01.01",
+          "name": "Столы письменные",
+          "names": 1870
+        },
+        {
+          "code": "01.16.07.02.01",
+          "name": "Шкафы для документов деревянные",
+          "names": 1427
+        },
+        {
+          "code": "01.16.07.02.02",
+          "name": "Шкафы для одежды деревянные",
+          "names": 1104
+        }
+      ],
+      "long_property_name_examples": [
+        {
+          "row": 365,
+          "name": "В нижней части стеллажа предусмотрен накопитель с глухой, непрозрачной передней стенкой. верхняя половина стеллажа оборудована витринным стеклом.",
+          "type": "Признак",
+          "unit": ""
+        },
+        {
+          "row": 1126,
+          "name": "В комплект входит защитный чехол для сиденья с нанесением брендированного элемента в виде веточки методом вышивки",
+          "type": "Признак",
+          "unit": ""
+        },
+        {
+          "row": 1384,
+          "name": "Опоры квадратного сечения, без металлических соединительных элементов, все части покрыты водостойким лаком (белой эмалью) не менее трех слоев",
+          "type": "Справочник",
+          "unit": ""
+        },
+        {
+          "row": 1688,
+          "name": "С внутренней стороны двери  приварено вертикальное усиливающее ребро, выполненное из стального листа толщиной  0.5 мм и высотой  12 мм",
+          "type": "Признак",
+          "unit": ""
+        },
+        {
+          "row": 2725,
+          "name": "Комплектуются центральным замком практик (2000 комбинаций), с возможностью смены цилиндра и мастер-ключом",
+          "type": "Признак",
+          "unit": ""
+        }
+      ]
+    },
+    "Одежда": {
+      "ste_rows": 99993,
+      "template_rows": 22905,
+      "valid_rows": 22793,
+      "invalid_rows": 112,
+      "raw_names": 8130,
+      "normalized_names": 8023,
+      "name_type_unit_definitions": 9694,
+      "raw_pipe_split_value_candidates": 11809,
+      "types": {
+        "справочник": 3526,
+        "текст": 11199,
+        "целое числовое значение": 3813,
+        "дробное числовое значение": 1588,
+        "признак": 2667
+      },
+      "categories": 200,
+      "properties_per_category": {
+        "median": 57.0,
+        "max": 911
+      },
+      "name_overlap_all_ktru": 601,
+      "name_overlap_active_specific": 588,
+      "ste_samples": [
+        {
+          "row": 2,
+          "id": "1174868",
+          "name": "Рюкзак Walker Pure Authentic цвет синий",
+          "characteristics": "Бренд Walker | Вес 0.00000 кг | Высота упаковки 50 мм | Габаритные размеры 450 х 285 х 150 см | Глубина упаковки 450 мм | Количество внешних карманов 4.00000 шт | Количество внутренних карманов 1.00000 шт | Материал Полиэстер | Объем главного отделения 28.00000 Л; ДМ3 | Особенности Анатомические лямки,Водоотталкивающая пропитка,Светоотражающие вставки | Половая принадлежность Для мальчиков | Специальные отделения Боковой карман для бутылки воды,Карман для пенала,Карман с сеткой,Отделение для ноутбука,Отделение-органайзер | Тип застежки Молния | Тип сумки Рюкзак | Упаковка Пакет | Цвет синий | Ширина упаковки 350 мм"
+        },
+        {
+          "row": 3,
+          "id": "1174869",
+          "name": "Рюкзак Star Wars",
+          "characteristics": "Бренд Star Wars | Вес 0.00000 кг | Высота упаковки 200 мм | Глубина упаковки 400 мм | Количество внешних карманов 4.00000 шт | Количество внутренних карманов 1.00000 шт | Материал Полиэстер | Особенности Анатомические лямки | Половая принадлежность Для мальчиков | Специальные отделения Карман с сеткой | Тип застежки Молния | Тип сумки Рюкзак | Упаковка Пакет | Цвет серый | Ширина упаковки 300 мм"
+        }
+      ],
+      "largest_categories": [
+        {
+          "code": "01.19.10.05",
+          "name": "Одежда специальная для защиты от общих производственных загрязнений и механических воздействий",
+          "names": 911
+        },
+        {
+          "code": "01.19.10.06",
+          "name": "Одежда специальная для защиты от пониженных температур",
+          "names": 784
+        },
+        {
+          "code": "01.19.01.01",
+          "name": "Одежда для взрослых форменная",
+          "names": 675
+        }
+      ],
+      "long_property_name_examples": [
+        {
+          "row": 287,
+          "name": "Для регулировки банта по шее металлический крючок, петля, передвижка. шейку и основную деталь галстука выкраивают из ткани верха в долевом направлении",
+          "type": "Признак",
+          "unit": ""
+        },
+        {
+          "row": 580,
+          "name": "Тип ниток для стачивания деталей, обметывания срезов, пришивания пуговиц, отделочных строчек, обметывания петель",
+          "type": "Текст",
+          "unit": ""
+        },
+        {
+          "row": 631,
+          "name": "Массовая доля основного сырья (волокна) в составе ткани/трикотажного полотна, подкладочного материала",
+          "type": "Дробное числовое значение",
+          "unit": "%"
+        },
+        {
+          "row": 2319,
+          "name": "Фуражка состоит из донышка овальной формы, четырёх стенок черного цвета, канта, козырька черного цвета, околыша.  кант расположен в шве соединения донышка со стенками",
+          "type": "Текст",
+          "unit": ""
+        },
+        {
+          "row": 2333,
+          "name": "Бязь хлопчатобумажная отбеленная прокладочная для прокладок в борта и пояс арт. 1124 ту 858-5729-2005",
+          "type": "Текст",
+          "unit": ""
+        }
+      ]
+    }
+  },
+  "ktru_subset_union": {
+    "names": 839,
+    "definitions": 857,
+    "categorical_facts": 2568,
+    "numeric_rules": 3875
+  },
+  "excel_union": {
+    "normalized_names": 43219,
+    "name_type_unit_definitions": 50907,
+    "overlap_all_ktru": 2548,
+    "overlap_active_specific": 2508
+  },
+  "combined_union_normalized_names": 55639
+}
