@@ -1,0 +1,76 @@
+# networks:
+#   default:
+#     ipam:
+#       config:
+#         - subnet: 172.31.255.0/24
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:?Set POSTGRES_PORT in .env}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+
+  languagetool:
+    image: erikvl87/languagetool:latest
+    container_name: languagetool
+    ports:
+      - "8010:8010"
+    environment:
+      - Java_Xms=512m
+      - Java_Xmx=2g
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ktru-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Nimble-модель живет вне compose (SSH-туннель на хосте, см. backend/README.md).
+      # Без модели /health и /preview работают, /analyze вернет 502.
+      NIMBLE_BASE_URL: http://host.docker.internal:8769
+      NIMBLE_TIMEOUT_SECONDS: "180"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Каталог КТРУ (XML, ~300 МБ) в git не хранится — только монтирование
+      - ./data:/app/data:ro
+      - ./experiments/results:/app/experiments/results:ro
+      - ./backend/results:/app/backend/results
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      # Первый парсинг XML-каталога при старте занимает до минуты
+      start_period: 90s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: frontend
+    container_name: ktru-frontend
+    ports:
+      # 5173 обычно занят локальным vite dev-сервером; переопределить: FRONTEND_PORT=... docker compose up
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_started
+      languagetool:
+        condition: service_started
+    restart: unless-stopped

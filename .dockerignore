@@ -1,0 +1,24 @@
+# Контекст для backend/Dockerfile — корень репозитория
+.git
+.venv
+.mimosa
+.zcode
+.zcodeignore
+.idea
+
+# Данные и результаты: монтируются томами, в образ не должны попадать
+data
+backend/results
+backend/.env
+experiments/results
+
+# Фронтенд собирается своим Dockerfile из контекста frontend/
+frontend
+
+docs
+scripts
+
+**/__pycache__
+*.pyc
+compose.yaml
+docker-compose.yml
