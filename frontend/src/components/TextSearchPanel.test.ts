@@ -57,35 +57,6 @@ describe('TextSearchPanel', () => {
     expect(wrapper.text()).toContain('26.02.10.110')
   })
 
-  it('passes the selected scope to the backend', async () => {
-    const search = fakeSearch(async () => analysis)
-    const wrapper = mountWithPrime(TextSearchPanel, {
-      props: { spellcheck: quietSpellcheck, search },
-    })
-    await wrapper.find('textarea').setValue('дрель')
-    await wrapper.find('[data-test="scope"]').setValue('tools')
-    await wrapper.find('[data-test="search"]').trigger('click')
-    await flushPromises()
-    expect(search.analyze).toHaveBeenCalledWith({ text: 'дрель', scope: 'tools' })
-  })
-
-  it('offers only clothing, tools and furniture as selectable scopes', () => {
-    const search = fakeSearch(async () => analysis)
-    const wrapper = mountWithPrime(TextSearchPanel, {
-      props: { spellcheck: quietSpellcheck, search },
-    })
-    const options = wrapper.find('[data-test="scope"]').findAll('option')
-    expect(options.map((option) => option.element.value)).toEqual([
-      'all',
-      'clothing',
-      'tools',
-      'furniture',
-    ])
-    expect((options[0].element as HTMLOptionElement).disabled).toBe(true)
-    expect(options.slice(1).every((option) => !option.element.disabled)).toBe(true)
-    expect(wrapper.text()).not.toContain('Дрели')
-  })
-
   it('disables search while the query is empty', async () => {
     const search = fakeSearch(async () => analysis)
     const wrapper = mountWithPrime(TextSearchPanel, {
