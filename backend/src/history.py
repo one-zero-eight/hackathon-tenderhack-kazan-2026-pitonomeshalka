@@ -7,6 +7,8 @@ import re
 
 import redis
 
+from experiments import classifier_experiments as ce
+
 logger = logging.getLogger("uvicorn.error")
 
 _KEY_PREFIX = "search_history:"
@@ -52,9 +54,13 @@ class SearchHistoryStore:
             return
         key = f"{_KEY_PREFIX}{safe_id}"
         try:
+            # Chips clip at ~50 chars, so entries differing only in case,
+            # ё/е or spacing read as duplicates; match on the catalog norm.
+            norm = ce.normalize(text)
             pipe = self._client.pipeline()
-            # Remove duplicate if it already exists, then push to front
-            pipe.lrem(key, 1, text)
+            for old in self._client.lrange(key, 0, -1):
+                if ce.normalize(old) == norm:
+                    pipe.lrem(key, 0, old)
             pipe.lpush(key, text)
             pipe.ltrim(key, 0, self._max_items - 1)
             pipe.expire(key, self._ttl_seconds)

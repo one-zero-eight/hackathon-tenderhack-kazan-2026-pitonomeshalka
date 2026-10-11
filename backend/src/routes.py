@@ -198,17 +198,22 @@ def analyze(body: AnalysisRequest, service: PipelineDependency) -> AnalysisRespo
         409: {"model": ErrorResponse,
               "description": "The question is stale (the run's current question differs) or the option is unknown. "
                              "Nothing was written; re-read the current clarification and answer that question."},
-        503: {"model": ErrorResponse, "description": "PostgreSQL is unavailable."},
+        503: {"model": ErrorResponse,
+              "description": "PostgreSQL is unavailable, or the LLM router is unreachable or not configured "
+                             "while a free-text answer was submitted."},
     },
 )
 def clarify(body: ClarifyRequest, service: PipelineDependency) -> AnalysisResponse:
     """Narrow a saved `needs_clarification` run to one KTRU code by answering its current question.
 
-    Send the `run_id` plus the `question_id` and chosen `option_id` from the current
-    `clarification`. The answer is validated against the run's current deterministic
-    question: a stale `question_id` or an unknown `option_id` returns `409` without
-    writing anything. Answers are recorded in the run's `clarification_state.json`
-    artifact; the saved analysis result itself is never modified.
+    Send the `run_id` plus the `question_id` and exactly one answer: the chosen
+    `option_id` from the current `clarification`, or a free-form `text`. With `text`,
+    the LLM router maps it onto one of the question's options (the mapping is
+    validated against the catalog options; no code is ever chosen by the model) and
+    the raw wording is kept in the recorded answer. A stale `question_id`, an unknown
+    `option_id` or a text that maps to nothing returns `409`/`422` without writing
+    anything. Answers are recorded in the run's `clarification_state.json` artifact;
+    the saved analysis result itself is never modified.
 
     The response is the same `AnalysisResponse` schema as `/analyze`, rebuilt from the
     original saved result plus clarification fields:
@@ -221,10 +226,11 @@ def clarify(body: ClarifyRequest, service: PipelineDependency) -> AnalysisRespon
     - With the "Ничего из перечисленного" option, `suggest_expand` is `true` and there
       is no next question; start a new `/analyze` with a larger `top_k` instead.
 
-    This endpoint reads and writes PostgreSQL only. It performs no classifier,
-    embedding or other model calls and runs while the classifier is busy.
+    This endpoint reads and writes PostgreSQL only and runs while the classifier is
+    busy; the only model call is the LLM router for a free-text `text` answer.
     Invalid bodies return `422`; an unknown run or a run without a saved result
-    returns `404`; database failures return `503`.
+    returns `404`; an unreachable or unconfigured router with a `text` answer and
+    database failures return `503`.
     """
     return service.clarify(body)
 

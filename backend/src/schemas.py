@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from experiments.config import env
 
@@ -108,6 +108,8 @@ class Clarification(BaseModel):
     kind: Literal["characteristic", "product"]
     question: str
     manual_choice: bool
+    # Free-text answers are accepted and mapped onto the options through the LLM router.
+    allow_text: bool = False
     options: list[ClarificationOption] = Field(min_length=1)
 
 
@@ -115,7 +117,14 @@ class ClarifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     run_id: str = Field(pattern=r"^[0-9]{8}T[0-9]{12}Z_[0-9a-f]{32}$")
     question_id: str = Field(min_length=1, max_length=256)
-    option_id: str = Field(min_length=1, max_length=256)
+    option_id: str | None = Field(default=None, min_length=1, max_length=256)
+    text: str | None = Field(default=None, min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def exactly_one_answer(self):
+        if (self.option_id is None) == (self.text is None):
+            raise ValueError("provide exactly one of option_id or text")
+        return self
 
 
 class FinalCardCharacteristic(BaseModel):

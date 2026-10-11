@@ -13,9 +13,11 @@ from experiments import classifier_experiments as ce
 from experiments.embedding_retrieval import MeowEmbedClient
 
 from backend.src.history import SearchHistoryStore
+from backend.src.llm import LLMUnavailable, RouterClient
 from backend.src.routes import router
 from backend.src.service import (
     ClarificationConflict,
+    ClarificationUnmapped,
     InferenceFailure,
     InvalidPlan,
     ModelBusy,
@@ -43,6 +45,14 @@ def clarification_conflict_handler(request: Request, error: ClarificationConflic
     return JSONResponse(status_code=409, content={"detail": {"error": str(error)}})
 
 
+def clarification_unmapped_handler(request: Request, error: ClarificationUnmapped) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": {"error": str(error)}})
+
+
+def llm_unavailable_handler(request: Request, error: LLMUnavailable) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": {"error": str(error)}})
+
+
 def inference_failure_handler(request: Request, error: InferenceFailure) -> JSONResponse:
     return JSONResponse(
         status_code=502,
@@ -67,6 +77,7 @@ def create_app(
     client_factory=ce.ClassifierClient,
     embedding_client_factory=MeowEmbedClient,
     store_factory=PostgresStore,
+    llm_factory=RouterClient,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -82,7 +93,8 @@ def create_app(
             if active is None:
                 logging.getLogger("uvicorn.error").warning("No active catalogue; run scripts/load_db.py --activate %s", configuration.catalog_key)
             application.state.pipeline = PipelineService(configuration, client_factory,
-                                                        embedding_client_factory, store=store)
+                                                        embedding_client_factory, store=store,
+                                                        llm_factory=llm_factory)
             history = SearchHistoryStore(
                 configuration.redis_url,
                 max_items=configuration.history_max_items,
@@ -106,6 +118,8 @@ def create_app(
     application.add_exception_handler(InvalidPlan, invalid_plan_handler)
     application.add_exception_handler(UnknownRun, unknown_run_handler)
     application.add_exception_handler(ClarificationConflict, clarification_conflict_handler)
+    application.add_exception_handler(ClarificationUnmapped, clarification_unmapped_handler)
+    application.add_exception_handler(LLMUnavailable, llm_unavailable_handler)
     def database_error_handler(request, error):
         logging.getLogger("uvicorn.error").exception("PostgreSQL request failed")
         return JSONResponse(status_code=503, content={"detail": {"error": "Database unavailable"}})

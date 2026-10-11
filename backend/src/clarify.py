@@ -65,6 +65,7 @@ def _characteristic_question(result, candidate_codes, round_number):
                 "kind": "characteristic",
                 "question": f"Укажите «{characteristic['name']}».",
                 "manual_choice": False,
+                "allow_text": True,
                 "options": [
                     _option(question_id, text, children)
                     for text, children in choices
@@ -90,6 +91,7 @@ def _product_question(result, candidate_codes, round_number):
         "kind": "product",
         "question": "Выберите вид товара.",
         "manual_choice": round_number >= 3,
+        "allow_text": True,
         "options": options + [_none_option(question_id)],
     }
 

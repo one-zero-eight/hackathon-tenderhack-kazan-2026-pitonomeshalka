@@ -14,6 +14,7 @@ from experiments.embedding_retrieval import EmbeddingError, MeowEmbedClient
 from backend.src import pipeline
 from backend.src.clarify import CLARIFICATION_STATE, apply_option, build_clarification, initial_candidate_codes
 from backend.src.final_card import build_final_card
+from backend.src.llm import LLMMappingError, RouterClient
 from backend.src.presentation import analysis_response, clarification_response, with_primary_clarification
 from backend.src.schemas import AnalysisRequest, AnalysisResponse, CandidateReference, ClarifyRequest, PreviewResponse
 from backend.src.storage import current_run
@@ -44,15 +45,21 @@ class ClarificationConflict(ValueError):
     """The submitted answer does not match the run's current deterministic clarification."""
 
 
+class ClarificationUnmapped(ValueError):
+    """The free-text answer did not match any option of the current question."""
+
+
 class PipelineService:
     def __init__(self, settings, client_factory=ce.ClassifierClient,
-                 embedding_client_factory=MeowEmbedClient, *, store):
+                 embedding_client_factory=MeowEmbedClient, *, store, llm_factory=RouterClient):
         from backend.src.retrieval import EmbeddingRetriever
 
         self.settings = settings
         self.client_factory = client_factory
         self.model_lock = Lock()
         self.store = store
+        self.llm = llm_factory(settings.llm_base_url, settings.llm_api_key, settings.llm_model,
+                               settings.llm_timeout_seconds)
         embedding_client = embedding_client_factory(settings.embedding_base_url, settings.embedding_model,
                                                     settings.embedding_timeout_seconds)
         embedding_client.recorder = store
@@ -190,6 +197,13 @@ class PipelineService:
             current_run.reset(token)
             self.model_lock.release()
 
+    def _interpret(self, question: dict, text: str) -> str:
+        """A free-text answer becomes a catalog option id through the router; never narrows on its own."""
+        try:
+            return self.llm.map_option(question["question"], question["options"], text)
+        except LLMMappingError as error:
+            raise ClarificationUnmapped(str(error)) from error
+
     def clarify(self, request: ClarifyRequest) -> AnalysisResponse:
         """Advance the deterministic clarification; pure database work, never the model lock."""
         run = self.store.get_run(request.run_id)
@@ -201,12 +215,18 @@ class PipelineService:
         current = build_clarification(result, state["candidate_codes"], state["round"])
         if request.question_id != current["question_id"]:
             raise ClarificationConflict("The question does not match the run's current clarification state")
+        option_id, free_text = request.option_id, None
+        if request.text is not None:
+            option_id = self._interpret(current, request.text)
+            free_text = request.text
         try:
-            narrowed = apply_option(current, request.option_id, state["candidate_codes"])
+            narrowed = apply_option(current, option_id, state["candidate_codes"])
         except ValueError as error:
             raise ClarificationConflict(str(error)) from error
-        answers = [*(state.get("answers") or []),
-                   {"question_id": request.question_id, "option_id": request.option_id}]
+        answer = {"question_id": request.question_id, "option_id": option_id}
+        if free_text is not None:
+            answer["text"] = free_text
+        answers = [*(state.get("answers") or []), answer]
         if not narrowed:
             state = {"round": state["round"], "candidate_codes": [], "question_id": request.question_id,
                      "answers": answers}

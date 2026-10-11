@@ -75,6 +75,11 @@ class Settings:
     redis_url: str = field(default_factory=lambda: env_or("REDIS_URL", ""), repr=False)
     history_ttl_seconds: int = field(default_factory=lambda: int(env_or("HISTORY_TTL_SECONDS", "604800")))
     history_max_items: int = field(default_factory=lambda: int(env_or("HISTORY_MAX_ITEMS", "5")))
+    # OpenAI-compatible router for free-text clarification answers; empty URL disables the LLM.
+    llm_base_url: str = field(default_factory=lambda: env_or("LLM_BASE_URL", ""), repr=False)
+    llm_api_key: str = field(default_factory=lambda: env_or("LLM_API_KEY", ""), repr=False)
+    llm_model: str = field(default_factory=lambda: env_or("LLM_MODEL", ""), repr=False)
+    llm_timeout_seconds: float = field(default_factory=lambda: float(env_or("LLM_TIMEOUT_SECONDS", "15")))
 
     def __post_init__(self):
         for name, value in (("CLASSIFIER_BASE_URL", self.classifier_base_url), ("EMBEDDING_BASE_URL", self.embedding_base_url)):
@@ -85,9 +90,16 @@ class Settings:
                             ("DATABASE_POOL_TIMEOUT_SECONDS", self.database_pool_timeout_seconds),
                             ("STARTUP_CHECK_TIMEOUT_SECONDS", self.startup_check_timeout_seconds),
                             ("CLASSIFIER_HEALTH_TIMEOUT_SECONDS", self.classifier_health_timeout_seconds),
-                            ("EMBEDDING_TIMEOUT_SECONDS", self.embedding_timeout_seconds)):
+                            ("EMBEDDING_TIMEOUT_SECONDS", self.embedding_timeout_seconds),
+                            ("LLM_TIMEOUT_SECONDS", self.llm_timeout_seconds)):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
+        if self.llm_base_url:
+            parsed = urlsplit(self.llm_base_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.query or parsed.fragment:
+                raise ValueError("LLM_BASE_URL must be an HTTP(S) base URL without query or fragment")
+            if not self.llm_model.strip():
+                raise ValueError("LLM_MODEL must not be blank when LLM_BASE_URL is set")
         for name, value in (("BACKEND_MAX_QUESTIONS", self.max_questions),
                             ("DATABASE_CONNECT_TIMEOUT_SECONDS", self.database_connect_timeout_seconds),
                             ("EMBEDDING_MAX_NAMES", self.embedding_max_names),
