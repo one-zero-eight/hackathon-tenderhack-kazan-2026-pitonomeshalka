@@ -1,4 +1,5 @@
 import PrimeVue from 'primevue/config'
+import Tooltip from 'primevue/tooltip'
 import { mount } from '@vue/test-utils'
 import type { MountingOptions } from '@vue/test-utils'
 import { PortalPreset } from '../theme'
@@ -12,6 +13,7 @@ export function mountWithPrime(component: unknown, options: AnyMountOptions = {}
     ...options,
     global: {
       ...options.global,
+      directives: { tooltip: Tooltip, ...options.global?.directives },
       plugins: [
         ...plugins,
         [
