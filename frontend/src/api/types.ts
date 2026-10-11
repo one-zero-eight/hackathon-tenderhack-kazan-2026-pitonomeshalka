@@ -9,6 +9,8 @@ export type AnalysisStatus =
 
 export type CandidateStatus = 'compatible' | 'uncertain' | 'rejected'
 
+export type ModelChoice = 'supported' | 'contradicted' | 'unknown' | 'conflicting'
+
 export type ExtraAction =
   'map_and_validate' | 'do_not_add' | 'review_before_add' | 'additional_field_policy_unknown'
 
@@ -36,6 +38,9 @@ export interface Candidate {
   name: string
   status: CandidateStatus
   reasons: string[]
+  /** Uncalibrated product identity evidence; may be absent in partial or older results. */
+  choice?: ModelChoice | null
+  probabilities?: Record<ModelChoice, number> | null
   missing_required: string[]
   unmatched_properties: string[]
   extra_characteristics: ExtraPropertyDecision[]

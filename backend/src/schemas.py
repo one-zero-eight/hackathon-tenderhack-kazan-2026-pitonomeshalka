@@ -1,6 +1,6 @@
 """Small, typed API contracts; detailed model evidence is saved separately."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -49,9 +49,26 @@ class ExtraPropertyDecision(Property):
     action: Literal["map_and_validate", "do_not_add", "review_before_add", "additional_field_policy_unknown"]
 
 
+ModelChoice = Literal["supported", "contradicted", "unknown", "conflicting"]
+Probability = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
+
+
+class CandidateProbabilities(BaseModel):
+    supported: Probability
+    contradicted: Probability
+    unknown: Probability
+    conflicting: Probability
+
+
 class Candidate(CandidateReference):
     status: Literal["compatible", "uncertain", "rejected"]
     reasons: list[str]
+    choice: ModelChoice | None = Field(
+        default=None, description="Selected product identity answer; absent when no model answer is available.",
+    )
+    probabilities: CandidateProbabilities | None = Field(
+        default=None, description="Uncalibrated product identity probabilities, not overall catalogue compatibility confidence.",
+    )
     missing_required: list[str] = Field(default_factory=list)
     unmatched_properties: list[str] = Field(default_factory=list)
     extra_characteristics: list[ExtraPropertyDecision] = Field(default_factory=list)

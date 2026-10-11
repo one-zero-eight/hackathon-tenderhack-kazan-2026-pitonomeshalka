@@ -211,6 +211,12 @@ def analyze(body: AnalysisRequest, service: PipelineDependency) -> AnalysisRespo
       evidence is insufficient; `rejected` means a definite conflict was found.
       Several candidates can be compatible, and required fields can still be
       missing. `missing_required` lists those fields for compatible candidates.
+    - Candidate `choice` and `probabilities` expose the classifier's product
+      identity answer (`supported`, `contradicted`, `unknown`, `conflicting`).
+      Candidates are sorted by `probabilities.supported` descending, with ties
+      broken by code and version. Candidates without an answer appear last and
+      omit these fields. These uncalibrated scores describe product identity;
+      catalogue characteristic checks still determine candidate status.
     - `recommended_candidate` is a provisional `code@version`, or `null` when no
       unique candidate satisfies the recommendation checks.
     - `status` is `needs_clarification`, `ready_for_review`, `retrieval_miss`,
@@ -265,6 +271,8 @@ def saved_result(
     recommendation. A saved partial analysis is also returned with `200`; check
     `complete_inference` and `status` before interpreting it. Older saved candidate
     statuses named `supported` are returned as `compatible`.
+    Older saved results may omit `choice` and `probabilities`; new results retain
+    their product identity probabilities and descending supported-score order.
 
     This endpoint reads PostgreSQL only. It does not call either model, create an
     analysis run, resume failed work or modify saved evidence. It remains available

@@ -122,7 +122,7 @@ Read an analysis in this order:
 1. **`status`** tells you whether more input or a review is needed.
 2. **`recommended_candidate`** identifies a provisional candidate as `code@version`, or is `null` when evidence is insufficient. It is not a final validated code.
 3. **`properties`** lists accepted description facts and normalized measurements, such as battery power and `18 В`. Unstated optional properties are omitted. Ambiguous accepted values are withheld and explained in warnings.
-4. **`candidates`** is ordered with compatible candidates first, then uncertain alternatives, then rejected candidates. Every decision has readable `reasons`.
+4. **`candidates`** is ordered by `probabilities.supported` descending, with ties broken by code and version. `choice` and `probabilities` expose the classifier's product identity answer across `supported`, `contradicted`, `unknown` and `conflicting`. These scores are uncalibrated and do not measure overall catalogue compatibility: characteristic checks still determine `status`. Candidates with no model answer appear last and omit these fields; older saved results can also omit them. Every decision has readable `reasons`.
 5. **`missing_required`** lists outstanding catalog-required properties for compatible candidates. Uncertain and rejected alternatives omit this input checklist; their decisions and reasons remain visible. **`clarifying_question`** asks for the next useful detail.
 
 | Candidate `status` | Meaning |
