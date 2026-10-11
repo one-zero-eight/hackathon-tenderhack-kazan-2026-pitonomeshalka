@@ -22,4 +22,5 @@ def analysis_response(report: Report, run_id: str) -> AnalysisResponse:
         recommended_candidate=f"{recommended.code}@{recommended.version}" if recommended is not None else None,
         requires_review=True, properties=[Property(name=name, value=value) for name, value in report.properties],
         candidates=candidates, clarifying_question=report.clarifying_question, warnings=report.warnings,
+        detected_families=report.families,
     )

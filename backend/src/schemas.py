@@ -69,6 +69,31 @@ class PreviewResponse(BaseModel):
     candidates: list[CandidateReference]
 
 
+class SplitOption(BaseModel):
+    text: str | None
+    spans: list[dict] | None
+    okei: str | None
+    issue: str | None
+    children: list[str]
+
+
+class SplittingCharacteristic(BaseModel):
+    code: str
+    name: str
+    required: bool
+    is_numeric: bool
+    resolved: bool
+    observed: bool
+    options: list[SplitOption]
+
+
+class DetectedFamily(CandidateReference):
+    is_template: Literal[True] = True
+    resolved: bool
+    candidate_codes: list[str]
+    splitting_characteristics: list[SplittingCharacteristic]
+
+
 class AnalysisResponse(BaseModel):
     run_id: str
     status: Literal["retrieval_miss", "incomplete_inference", "no_compatible_shortlist_candidate",
@@ -80,6 +105,7 @@ class AnalysisResponse(BaseModel):
     candidates: list[Candidate]
     clarifying_question: str | None
     warnings: list[str]
+    detected_families: list[DetectedFamily] = Field(default_factory=list)
 
 
 class FailureDetail(BaseModel):

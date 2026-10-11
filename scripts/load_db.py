@@ -79,6 +79,9 @@ def import_catalogue(store, xml_paths, xlsx_paths=(), *, activate=None):
             if source_manifest(xml_paths, xlsx_paths)[0] != fingerprint:
                 raise ValueError("source files changed during import; staged rows were rolled back")
             connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+            connection.execute(text(
+                f'REFRESH MATERIALIZED VIEW "{store.catalogue_schema}"."ktru_family_splits"'
+            ))
         else:
             print(f"catalogue import {fingerprint} already loaded; skipping")
         if activate is not None:

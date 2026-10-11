@@ -26,11 +26,12 @@ class Retrieval:
     truncated: bool
     index: str | None = None
     details: dict = field(default_factory=dict)
+    families: list[dict] = field(default_factory=list)
 
     def metadata(self):
         return {"import_sha256": self.import_sha256, "evidence": self.evidence,
                 "scope_positions": self.scope_positions, "truncated": self.truncated,
-                "index_sha256": self.index, **self.details}
+                "index_sha256": self.index, "families": self.families, **self.details}
 
 
 class EmbeddingRetriever:
@@ -53,8 +54,27 @@ class EmbeddingRetriever:
             vector = unit_vector(vectors[0])
         positions, evidence, count = self.store.search_catalogue(
             import_id, text, vector, fingerprint, scope, top_k)
+        families = self.store.get_family_splits(import_id, positions, scope)
+        by_parent = {(family["code"], family["version"]): family for family in families}
+        codes = [position.code for position in positions]
+        for position in positions:
+            family = by_parent.get((position.parent_code, position.parent_version))
+            siblings = [child["code"] for child in family["children"]] if family else []
+            additions = [code for code in siblings if code not in codes]
+            if len(codes) + len(additions) <= top_k:
+                codes.extend(additions)
+        loaded = {position.code: position for position in positions}
+        missing = [code for code in codes if code not in loaded]
+        if missing:
+            loaded.update({position.code: position for position in self.store.get_positions(import_id, missing)})
+        positions = [loaded[code] for code in codes]
+        parents = {(p.parent_code, p.parent_version) for p in positions}
+        families = [family for family in families if (family["code"], family["version"]) in parents]
+        by_code = {hit["code"]: hit for hit in evidence}
+        evidence = [by_code.get(p.code, {"code": p.code, "name": p.name,
+                    "method": "family_sibling", "parent_code": p.parent_code}) for p in positions]
         return Retrieval(import_id, positions, evidence, count, len(positions) < count, fingerprint,
                          {"method": "hybrid" if ready else "lexical", "scope": scope,
                           "semantic": {"ready": ready, "model": self.config["model"],
                                        "note": None if ready else "Prepare embeddings offline to enable semantic retrieval"},
-                          "elapsed_seconds": round(perf_counter() - started, 3)})
+                          "elapsed_seconds": round(perf_counter() - started, 3)}, families=families)

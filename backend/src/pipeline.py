@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Literal
 
+from sqlalchemy.dialects.postgresql import Range
+
 from experiments import classifier_experiments as ce
 
 from backend.src.models import KtruCharacteristic, KtruPosition, KtruValue
@@ -116,6 +118,7 @@ class Plan:
     bindings: list[Binding]
     spans: list[dict]
     jobs: list[Job]
+    scoped_hypotheses: dict[tuple, list[Hypothesis]] = field(default_factory=dict)
 
     @property
     def question_count(self) -> int:
@@ -162,13 +165,28 @@ def prepare(retrieval: Retrieval, text: str, chunk_size: int = 4,
                     ce.canonical_value(char.name, value.text), value.okei))
                 hypothesis.sources.append(Source(position, char, value))
                 # A name is an extraction prompt, not a characteristic identity.
-                scope = (char.code, ce.normalize(char.name), value.okei)
+                scope = ((position.parent_code or position.code, position.parent_version or position.version),
+                         char.code, ce.normalize(char.name), value.okei)
                 group = scoped.setdefault(scope, [])
                 if hypothesis not in group:
                     group.append(hypothesis)
+    for family in retrieval.families:
+        products.setdefault(ce.normalize(family["name"]), [])
+        for split in family["splitting_characteristics"]:
+            for variant in split["variants"]:
+                for value in variant["values"]:
+                    if variant["is_numeric"] or not value["text"] or value["issue"]:
+                        continue
+                    key = (ce.normalize(split["name"]), value_key(split["name"], value["text"]), value["okei"])
+                    hypothesis = hypotheses.setdefault(key, Hypothesis("fact_" + ce.identity(*key), split["name"],
+                        ce.canonical_value(split["name"], value["text"]), value["okei"]))
+                    scope = ((family["code"], family["version"]), split["code"], ce.normalize(split["name"]), value["okei"])
+                    group = scoped.setdefault(scope, [])
+                    if hypothesis not in group:
+                        group.append(hypothesis)
     for name, positions in sorted(products.items()):
         qid = "product_" + ce.identity(name)
-        question = ce.fact_question({"name": "Вид самого товара", "value": positions[0].name})
+        question = ce.fact_question({"name": "Вид самого товара", "value": positions[0].name if positions else name})
         jobs.append(Job(qid, "pipeline_product", ce.request_body(text, {qid: question}),
                         positions=positions))
     facts = sorted(hypotheses.values(), key=lambda h: h.id)
@@ -189,25 +207,38 @@ def prepare(retrieval: Retrieval, text: str, chunk_size: int = 4,
                 bindings.append(binding)
                 scope = (char.code, ce.normalize(char.name), unit)
                 if not char.is_numeric:
-                    binding.hypotheses = scoped.get(scope, [])
+                    binding.hypotheses = scoped.get(((position.parent_code or position.code,
+                        position.parent_version or position.version), *scope), [])
                     continue
                 binding.spans = [span for span in spans if span["okei"] == unit and scalar_span(span, text)]
                 if binding.spans:
                     binding.question_id = "measurement_" + ce.identity(*scope)
                     numeric_groups.setdefault(scope, []).append(binding)
-    for scope, group in sorted(numeric_groups.items(), key=lambda item: repr(item[0])):
-        binding = group[0]
-        if len(binding.spans) > 253:
+    numeric_properties = {scope: (group[0].characteristic.name, group[0].spans)
+                          for scope, group in numeric_groups.items()}
+    for family in retrieval.families:
+        for split in family["splitting_characteristics"]:
+            for variant in split["variants"]:
+                if not variant["is_numeric"]:
+                    continue
+                for unit in {value["okei"] for value in variant["values"]}:
+                    scope = (split["code"], ce.normalize(split["name"]), unit)
+                    matching = [span for span in spans if span["okei"] == unit and scalar_span(span, text)]
+                    if matching:
+                        numeric_properties.setdefault(scope, (split["name"], matching))
+    for scope, (name, matching) in sorted(numeric_properties.items(), key=lambda item: repr(item[0])):
+        if len(matching) > 253:
             raise ValueError("Too many numeric spans for a choice question; shorten the input")
-        criteria = {span["id"]: f"Фрагмент {span['raw']} (позиции {span['start']}:{span['end']}) явно задает '{binding.characteristic.name}' самого товара; нормализованное значение {span['value']}, ОКЕИ {span['okei']}."
-                    for span in binding.spans}
+        criteria = {span["id"]: f"Фрагмент {span['raw']} (позиции {span['start']}:{span['end']}) явно задает '{name}' самого товара; нормализованное значение {span['value']}, ОКЕИ {span['okei']}."
+                    for span in matching}
         criteria.update(unknown="Свойство не указано. Числа упаковки, аксессуаров и других объектов не подходят.",
                         conflicting="Для одного свойства товара одновременно указаны несовместимые значения, ни одно не отменено.")
-        question = {"type": "choice", "instructions": f"Выбери точное числовое значение свойства '{binding.characteristic.name}' самого товара. Учитывай контекст и исправления. Не подставляй число только из-за совпадения единицы измерения.",
+        question = {"type": "choice", "instructions": f"Выбери точное числовое значение свойства '{name}' самого товара. Учитывай контекст и исправления. Не подставляй число только из-за совпадения единицы измерения.",
                     "criteria": criteria}
         jobs.append(Job("binding_" + ce.identity(*scope), "pipeline_numeric",
-                        ce.request_body(text, {binding.question_id: question}), bindings=group))
-    plan = Plan(text, retrieval, facts, bindings, spans, jobs)
+                        ce.request_body(text, {"measurement_" + ce.identity(*scope): question}),
+                        bindings=numeric_groups.get(scope, [])))
+    plan = Plan(text, retrieval, facts, bindings, spans, jobs, scoped)
     if plan.question_count > max_questions:
         raise ValueError(f"Shortlist requires {plan.question_count} questions, above BACKEND_MAX_QUESTIONS={max_questions}; reduce top_k or inspect a narrower scope")
     return plan
@@ -341,6 +372,7 @@ class Report:
     warnings: list[str]
     answers: dict[str, dict]
     threshold: float
+    families: list[dict] = field(default_factory=list)
 
     def snapshot(self) -> dict:
         return {"status": self.status, "final_code": None,
@@ -350,29 +382,114 @@ class Report:
                 "threshold_uncalibrated": self.threshold, "answers": self.answers,
                 "categorical_facts": [dict(h.snapshot(), answer=self.answers.get(h.id)) for h in self.plan.hypotheses],
                 "candidates": [candidate.snapshot() for candidate in self.candidates],
-                "clarifying_question": self.clarifying_question, "warnings": self.warnings}
+                "clarifying_question": self.clarifying_question, "warnings": self.warnings,
+                "detected_families": self.families}
 
 
 def categorical_check(binding: Binding, answers: dict[str, dict], threshold: float) -> Finding:
-    char = binding.characteristic
-    positive = [h for h in binding.hypotheses if accepted(answers.get(h.id), "supported", threshold)]
-    conflicting = [h for h in binding.hypotheses if accepted(answers.get(h.id), "conflicting", threshold)]
-    values = [v for v in char.values if v.okei == binding.unit]
+    status, reason, hypotheses = categorical_rule(binding.characteristic, binding.unit,
+                                                 binding.hypotheses, answers, threshold)
+    return Finding(binding, status, reason, hypotheses)
+
+
+def categorical_rule(char, unit, hypotheses, answers, threshold):
+    """Evaluate a child domain; templates are never passed as product constraints."""
+    positive = [h for h in hypotheses if accepted(answers.get(h.id), "supported", threshold)]
+    conflicting = [h for h in hypotheses if accepted(answers.get(h.id), "conflicting", threshold)]
+    values = [v for v in char.values if v.okei == unit]
     allowed = {value_key(char.name, v.text) for v in values if v.text and not v.issue}
     unknown_rules = not values or any(v.issue or not v.text for v in values)
     if conflicting or (char.choice == "one_of" and len(positive) > 1):
-        return Finding(binding, "unknown", "Неоднозначные значения характеристики.", positive + conflicting)
+        return "unknown", "Неоднозначные значения характеристики.", positive + conflicting
     if positive:
         unlisted = [h for h in positive if value_key(char.name, h.value) not in allowed]
         if unlisted:
-            return Finding(binding, "unknown" if unknown_rules else "conflict",
-                           "Правило каталога требует проверки." if unknown_rules else "Значение не допускается этой характеристикой.", unlisted)
-        return Finding(binding, "matched", "Значение подтверждено описанием.", positive)
+            return ("unknown" if unknown_rules else "conflict",
+                    "Правило каталога требует проверки." if unknown_rules else "Значение не допускается этой характеристикой.", unlisted)
+        return "matched", "Значение подтверждено описанием.", positive
     if char.choice == "fixed" and allowed and not unknown_rules:
-        own = [h for h in binding.hypotheses if value_key(char.name, h.value) in allowed]
+        own = [h for h in hypotheses if value_key(char.name, h.value) in allowed]
         if own and any(accepted(answers.get(h.id), "contradicted", threshold) for h in own):
-            return Finding(binding, "conflict", "Описание отрицает фиксированное значение.", own)
-    return Finding(binding, "unknown", "Правило каталога требует проверки." if unknown_rules else "Значение не указано.")
+            return "conflict", "Описание отрицает фиксированное значение.", own
+    return "unknown", "Правило каталога требует проверки." if unknown_rules else "Значение не указано.", []
+
+
+def resolve_families(plan: Plan, candidates, answers, threshold, complete):
+    """Compare cached sibling domains, including children outside the shortlist."""
+    assessments = {candidate.position.code: candidate for candidate in candidates}
+    families, questions = [], []
+    for family in plan.retrieval.families:
+        names = {family["name"], *(child["name"] for child in family["children"])}
+        if not any(accepted(answers.get("product_" + ce.identity(ce.normalize(name))),
+                            "supported", threshold) for name in names):
+            continue
+        viable = {child["code"] for child in family["children"]
+                  if child["code"] not in assessments or assessments[child["code"]].status != "rejected"}
+        observed, checked = set(), set()
+        for split in family["splitting_characteristics"]:
+            for variant in split["variants"]:
+                values = [KtruValue(text=value["text"], issue=value["issue"], okei=value["okei"],
+                    spans=[Range(Decimal(span["lower"]) if span["lower"] is not None else None,
+                                 Decimal(span["upper"]) if span["upper"] is not None else None,
+                                 bounds=span["bounds"], empty=span["empty"])
+                           for span in value["spans"] or []]) for value in variant["values"]]
+                char = KtruCharacteristic(code=split["code"], name=split["name"],
+                    is_numeric=variant["is_numeric"], choice=variant["choice"], values=values)
+                outcomes = []
+                for unit in {value.okei for value in values}:
+                    if char.is_numeric:
+                        scope = (char.code, ce.normalize(char.name), unit)
+                        answer = answers.get("measurement_" + ce.identity(*scope))
+                        span = next((span for span in plan.spans if span["okei"] == unit
+                                     and scalar_span(span, plan.text) and accepted(answer, span["id"], threshold)), None)
+                        outcomes.append(product_numeric_check(char, span["value"], unit) if span else "unknown")
+                    else:
+                        scope = ((family["code"], family["version"]), char.code, ce.normalize(char.name), unit)
+                        hypotheses = plan.scoped_hypotheses.get(scope, [])
+                        outcomes.append(categorical_rule(char, unit, hypotheses, answers, threshold)[0])
+                if "matched" in outcomes or "conflict" in outcomes:
+                    checked.add((split["code"], split["name_key"]))
+                if "conflict" in outcomes:
+                    viable.difference_update(variant["children"])
+                elif "matched" in outcomes:
+                    observed.add((split["code"], split["name_key"]))
+        for child in family["children"]:
+            candidate = assessments.get(child["code"])
+            if candidate is not None and child["code"] not in viable and candidate.status != "rejected":
+                candidate.status = "rejected"
+                candidate.reasons.append("Подтверждённая характеристика исключает эту ветвь семейства.")
+        if not viable:
+            continue
+        splits = []
+        for split in family["splitting_characteristics"]:
+            variants = [variant for variant in split["variants"] if viable.intersection(variant["children"])]
+            present = {code for variant in variants for code in variant["children"] if code in viable}
+            domains = {variant["domain"] for variant in variants}
+            # An absent conditional field is harmless until supplied evidence needs its rule.
+            unresolved = ((len(viable) > 1 and (len(domains) > 1 or present != viable))
+                          or (present != viable and (split["code"], split["name_key"]) in checked))
+            options = [{**value, "children": sorted(viable.intersection(variant["children"]))}
+                       for variant in variants for value in variant["values"]]
+            splits.append({"code": split["code"], "name": split["name"], "required": split["required"],
+                           "is_numeric": split["is_numeric"], "resolved": not unresolved,
+                           "observed": (split["code"], split["name_key"]) in observed, "options": options})
+            if unresolved and (split["code"], split["name_key"]) not in observed:
+                labels = sorted({value["text"] for value in options if value["text"] and not value["issue"]})
+                question = "Укажите «" + split["name"] + "»"
+                question += (": " + " / ".join(labels) if labels and len(labels) <= 8 else "") + "."
+                # Required first, then the most balanced partition; no name-based code grouping.
+                largest = max([len(viable - present)] + [len(viable.intersection(v["children"])) for v in variants])
+                questions.append(((not split["required"], present != viable, largest / len(viable),
+                                   split["is_numeric"], split["name"], family["code"]), question))
+        remaining = [child for child in family["children"] if child["code"] in viable]
+        only = assessments.get(remaining[0]["code"]) if len(remaining) == 1 else None
+        resolved = (complete and only is not None and only.status == "supported"
+                    and not any(not split["resolved"] for split in splits))
+        families.append({"code": family["code"], "version": str(family["version"]), "name": family["name"],
+                         "is_template": True, "resolved": resolved,
+                         "candidate_codes": [child["code"] for child in remaining],
+                         "splitting_characteristics": splits})
+    return families, min(questions)[1] if questions else None
 
 
 def analyze(plan: Plan, records: list[dict], threshold: float = .8,
@@ -468,20 +585,32 @@ def analyze(plan: Plan, records: list[dict], threshold: float = .8,
     unbound = [span["raw"] for span in plan.spans if span["id"] not in used_spans]
     if unbound:
         warnings.append("Не удалось связать с характеристиками: " + ", ".join(unbound) + ".")
+    families, split_question = resolve_families(plan, candidates, answers, threshold, complete)
     supported = [c for c in candidates if c.status == "supported"]
     survivors = [c for c in candidates if c.status != "rejected"]
     uncertain_candidates = [c for c in survivors if c.status == "uncertain"]
     if uncertain_candidates:
         warnings.append("Есть неопределённые альтернативы; они сохранены для проверки, но не подтверждены.")
+    unresolved_families = [family for family in families if not family["resolved"]]
+    linked = {(family["code"], family["version"]) for family in plan.retrieval.families}
+    missing_parents = [candidate for candidate in survivors if candidate.position.parent_code
+                       and (candidate.position.parent_code, candidate.position.parent_version) not in linked]
+    if missing_parents:
+        warnings.append("Родительский шаблон указан, но его версия отсутствует в снимке; полнота дочерних вариантов не подтверждена.")
     recommended = (supported[0].position if len(supported) == 1 and complete
-                   and not unresolved and not uncertain_candidates else None)
+                   and not supported[0].missing_required and not missing_parents
+                   and not unresolved and not uncertain_candidates and not unresolved_families and not split_question else None)
     status: AnalysisStatus
     if not candidates:
         status, question = "retrieval_miss", "Уточните наименование и назначение товара или область поиска: кандидаты не найдены."
     elif not complete:
         status, question = "incomplete_inference", "Завершите проверку характеристик: отсутствующие ответы нельзя считать отрицанием."
-    elif not survivors:
+    elif not survivors and not families:
         status, question = "no_compatible_shortlist_candidate", "Проверьте указанные противоречия; также может потребоваться расширить поиск кандидатов."
+    elif split_question or unresolved_families:
+        status, question = "needs_clarification", split_question or "Проверьте оставшиеся дочерние позиции семейства: имеющихся сведений недостаточно для выбора кода КТРУ."
+    elif missing_parents:
+        status, question = "needs_clarification", "Проверьте родительский шаблон и его версию перед выбором дочернего кода КТРУ."
     elif unresolved or uncertain_candidates:
         status, question = "needs_clarification", "Уточните вид товара и неоднозначные характеристики перед исключением кандидатов."
     elif len(supported) == 1 and not supported[0].missing_required:
@@ -492,4 +621,4 @@ def analyze(plan: Plan, records: list[dict], threshold: float = .8,
         question = ("Укажите «" + missing_names[0] + "»." if missing_names else
                     "Уточните вид и назначение товара: " + "; ".join(sorted({c.position.name for c in survivors})) + ".")
     return Report(plan, status, complete, recommended, candidates, sorted(properties), question,
-                  warnings, answers, threshold)
+                  warnings, answers, threshold, families)

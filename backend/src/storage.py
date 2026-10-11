@@ -119,6 +119,77 @@ class PostgresStore:
             session.expunge_all()
             return positions
 
+    def get_family_splits(self, import_sha256, positions, scope="all"):
+        """Resolved parent templates, all eligible direct siblings and cached split domains."""
+        conditions = eligible(import_sha256, scope)
+        codes = sorted({position.code for position in positions})
+        if not codes:
+            return []
+        position = KtruPosition.__table__
+        parent = position.alias("parent")
+        families = {}
+        with self.engine.connect() as connection:
+            parents = connection.execute(
+                select(parent.c.code, parent.c.version, parent.c.name)
+                .select_from(position.join(parent,
+                    (parent.c.import_sha256 == position.c.import_sha256) &
+                    (parent.c.code == position.c.parent_code) &
+                    (parent.c.version == position.c.parent_version)))
+                .where(position.c.import_sha256 == import_sha256, position.c.code.in_(codes),
+                       position.c.is_template.is_(False), parent.c.is_template.is_(True))
+                .distinct().order_by(parent.c.code, parent.c.version)
+            )
+            for row in parents:
+                families[row.code, row.version] = {
+                    "code": row.code, "version": row.version, "name": row.name,
+                    "children": [], "splitting_characteristics": [],
+                }
+            if not families:
+                return []
+            parent_codes = sorted({code for code, version in families})
+            children = connection.execute(
+                select(position.c.code, position.c.version, position.c.name,
+                       position.c.parent_code, position.c.parent_version)
+                .where(*conditions, position.c.parent_code.in_(parent_codes))
+                .order_by(position.c.code)
+            )
+            for child in children:
+                family = families.get((child.parent_code, child.parent_version))
+                if family is not None:
+                    family["children"].append({
+                        "code": child.code, "version": child.version, "name": child.name,
+                    })
+            child_codes = {key: {child["code"] for child in family["children"]}
+                           for key, family in families.items()}
+            cached = connection.execute(text(
+                f'SELECT parent_code, parent_version, characteristic_code, name, name_key, parent_required, '
+                f'variants, domain_signatures FROM "{self.catalogue_schema}"."ktru_family_splits" '
+                'WHERE import_sha256 = :import_sha256 AND parent_code = ANY(:parents) '
+                'ORDER BY parent_code, parent_version, characteristic_code, name_key'
+            ), {"import_sha256": import_sha256, "parents": parent_codes})
+            for row in cached:
+                key = (row.parent_code, row.parent_version)
+                if key not in families:
+                    continue
+                variants, domains, present = [], set(), set()
+                for variant, domain in zip(row.variants, row.domain_signatures, strict=True):
+                    members = sorted(child_codes[key].intersection(variant["children"]))
+                    if members:
+                        domain_digest = digest(domain)
+                        variants.append({**variant, "children": members, "domain": domain_digest})
+                        domains.add(domain_digest)
+                        present.update(members)
+                # Missing characteristics remain unknown, never an invented empty constraint.
+                if not variants or (len(domains) <= 1 and present == child_codes[key]):
+                    continue
+                families[key]["splitting_characteristics"].append({
+                    "code": row.characteristic_code, "name": row.name, "name_key": row.name_key,
+                    "is_numeric": any(variant["is_numeric"] for variant in variants),
+                    "required": row.parent_required or any(variant["required"] for variant in variants),
+                    "variants": variants,
+                })
+        return list(families.values())
+
     def has_embeddings(self, import_sha256, fingerprint):
         with self.session() as session:
             return session.scalar(select(KtruPosition.code).where(
@@ -136,6 +207,7 @@ class PostgresStore:
             session.execute(text("SET LOCAL hnsw.iterative_scan = 'strict_order'"))
             session.execute(text("SET LOCAL hnsw.ef_search = 100"))
             session.execute(text("SET LOCAL pg_trgm.similarity_threshold = 0.1"))
+            session.execute(text("SET LOCAL pg_trgm.strict_word_similarity_threshold = 0.4"))
             norm = getattr(func, self.catalogue_schema).norm
             for field, model, column in (("position", KtruPosition, KtruPosition.name),
                                           ("characteristic", KtruCharacteristic, KtruCharacteristic.name),
@@ -154,8 +226,17 @@ class PostgresStore:
                             (KtruValue.position_code == KtruCharacteristic.position_code) &
                             (KtruValue.characteristic_code == KtruCharacteristic.code))
                         extra += [KtruCharacteristic.actual.is_(True), KtruValue.text.is_not(None), KtruValue.issue.is_(None)]
+                        statement = statement.add_columns(
+                            KtruCharacteristic.code.label("characteristic_code"),
+                            KtruCharacteristic.name.label("characteristic_name"),
+                            KtruValue.id.label("value_id"), KtruValue.text.label("value"))
                 modes = [("lexical", func.similarity(norm(column), norm(query)),
                           [norm(column).bool_op("%")(norm(query))])]
+                if field == "value":
+                    # Match a value to a word-bounded extent, not the entire product description.
+                    modes.append(("phrase", func.strict_word_similarity(norm(column), norm(query)),
+                                  [norm(column).bool_op("<<%")(norm(query)),
+                                   norm(column).bool_op("~")("[[:alpha:]]{4}")]))
                 if vector is not None:
                     modes.append(("semantic", model.embedding.cosine_distance(vector),
                                   [model.embedding_config == fingerprint, model.embedding.is_not(None)]))
@@ -177,6 +258,13 @@ class PostgresStore:
                         hit = hits.setdefault(row.code, {"code": row.code, "name": row.name, "score": 0.0, "fields": {}})
                         hit["fields"][field + "_" + mode] = signal
                         hit["score"] += (2 if field == "position" else 1) / (60 + rank)
+                        if field == "value":
+                            hit.setdefault("value_matches", {})[mode] = {
+                                "characteristic_code": row.characteristic_code,
+                                "characteristic_name": row.characteristic_name,
+                                "value_id": row.value_id, "value": row.value,
+                                "similarity": signal,
+                            }
                         if capped:
                             hit["field_scan_capped"] = True
         # Round-robin name families retains alternative codes instead of returning one arbitrary code.
