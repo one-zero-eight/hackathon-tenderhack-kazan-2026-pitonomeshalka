@@ -657,3 +657,4 @@ seeds/*.dump*
 .mimosa/
 superpowers/
 plans/
+.desing-qa*
