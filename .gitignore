@@ -658,3 +658,4 @@ seeds/*.dump*
 superpowers/
 plans/
 .desing-qa*
+.zcode
