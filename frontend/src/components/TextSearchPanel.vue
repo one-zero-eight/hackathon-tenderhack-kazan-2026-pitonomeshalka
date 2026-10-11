@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import Button from 'primevue/button'
 import { computed, onMounted, ref, watch } from 'vue'
-import type { AnalysisScope } from '../api/types'
 import { useSpellcheck, type SpellcheckClient } from '../composables/useSpellcheck'
 import { useTextSearch, type TextSearchClient } from '../composables/useTextSearch'
 import { getSessionId } from '../lib/sessionId'
@@ -24,13 +23,11 @@ const props = withDefaults(
 
 const MAX_LENGTH = 10000
 
-const SELECT_CLASS = 'field-base text-sm'
 const TEXTAREA_CLASS = 'field-base w-full resize-y px-4 py-3 text-[15px] leading-relaxed transition'
 const ERROR_CARD =
   'card-registry space-y-2 border-accent-200 bg-accent-50 p-4 text-sm text-accent-700'
 
 const text = ref('')
-const scope = ref<AnalysisScope>('all')
 const spell = useSpellcheck(props.spellcheck ?? lt, { debounceMs: 300 })
 const searchState = useTextSearch(props.search ?? api)
 const { matches, checkedText, checking, error: spellError } = spell
@@ -83,7 +80,7 @@ function applyOne(index: number, replacement: string) {
 }
 
 function run() {
-  void searchState.search(text.value, scope.value)
+  void searchState.search(text.value)
 }
 </script>
 
@@ -106,15 +103,8 @@ function run() {
         rows="4"
       ></textarea>
       <div class="flex flex-wrap items-center gap-3">
-        <label class="flex items-center gap-2 text-sm text-ink-500" for="scope">
-          Раздел
-          <select id="scope" v-model="scope" :class="SELECT_CLASS" data-test="scope">
-            <option disabled value="all">Все разделы</option>
-            <option value="clothing">Одежда</option>
-            <option value="tools">Инструменты</option>
-            <option value="furniture">Мебель</option>
-          </select>
-        </label>
+        <SearchHistory :queries="historyQueries" @select="selectFromHistory" />
+
         <Button
           class="btn-cta ml-auto"
           :disabled="!text.trim() || searchPhase === 'searching'"
@@ -126,7 +116,6 @@ function run() {
           Найти в КТРУ <span aria-hidden="true">→</span>
         </Button>
       </div>
-      <SearchHistory :queries="historyQueries" @select="selectFromHistory" />
       <p class="text-[13px] text-ink-500" v-if="checking">Проверяем орфографию…</p>
       <p class="text-[13px] text-warning-700" v-else-if="spellError" data-test="lt-warning">
         Проверка орфографии недоступна — отправим текст как есть

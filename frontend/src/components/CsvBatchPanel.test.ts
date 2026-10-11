@@ -39,6 +39,15 @@ describe('CsvBatchPanel', () => {
     expect(wrapper.find('[data-test="column"]').exists()).toBe(false)
   })
 
+  it('previews every parsed row, not just the first two', async () => {
+    const wrapper = mountWithPrime(CsvBatchPanel, {
+      props: { analyze: async (text: string) => analysisFor(text), correct: async () => null },
+    })
+    await pickFile(wrapper, 'первая\nвторая\nтретья\nчетвёртая')
+    expect(wrapper.text()).toContain('строк: 4')
+    expect(wrapper.findAll('[data-test="preview-row"]')).toHaveLength(4)
+  })
+
   it('streams finished rows into the accordion list', async () => {
     const analyze = vi.fn(async (text: string) => analysisFor(text))
     const wrapper = mountWithPrime(CsvBatchPanel, {

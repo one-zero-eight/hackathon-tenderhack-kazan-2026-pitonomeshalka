@@ -15,6 +15,10 @@ dist-ssr
 # Tool state written by local agent/session hooks
 .mimosa
 
+# Screenshots captured while checking the UI in a browser
+gui-test-screenshots
+presentation
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

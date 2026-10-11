@@ -158,13 +158,14 @@ function reset() {
 
       <div class="card-registry space-y-3 bg-primary-50 p-4" v-if="table">
         <p class="text-sm font-semibold text-ink-900">{{ fileName }} — строк: {{ rowsCount }}</p>
-        <div class="overflow-x-auto bg-white">
+        <div class="max-h-64 overflow-auto bg-white">
           <table class="w-full text-xs">
             <tbody>
               <tr
                 class="border-b border-ink-200 last:border-0"
-                v-for="(row, index) in table.rows.slice(0, 2)"
+                v-for="(row, index) in table.rows"
                 :key="index"
+                data-test="preview-row"
               >
                 <td
                   class="max-w-64 truncate py-1.5 pr-3 font-mono text-ink-700"

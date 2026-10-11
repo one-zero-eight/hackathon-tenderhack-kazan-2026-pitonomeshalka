@@ -189,16 +189,15 @@ body {
     background-color: var(--color-primary-50);
   }
 
-  /* Тултип — «летающий штамп»: квадратный, чернильный, без стрелки
-     (Aura-стрелка обнуляется префлайтом, квадратной форме она не нужна) */
+  /* Тултип — спокойная полупрозрачная подсказка без визуального доминирования. */
   .p-tooltip-text {
     box-shadow: var(--shadow-lift);
     border-radius: 0;
-    background-color: var(--color-ink-900);
+    background-color: rgb(26 26 26 / 72%);
     padding: 8px 12px;
     max-width: 300px;
-    color: #ffffff;
-    font-weight: 600;
+    color: rgb(255 255 255 / 82%);
+    font-weight: 500;
     font-size: 13px;
     line-height: 1.45;
   }
@@ -355,6 +354,7 @@ body {
 
   /* История поисков — после .p-button-text, чтобы перебить прозрачность */
   .hist-chip {
+    justify-content: flex-start;
     border: 1px solid var(--color-ink-300);
     border-radius: 0;
     background-color: #ffffff;
@@ -365,14 +365,22 @@ body {
     color: var(--color-ink-700);
     font-weight: 600;
     font-size: 12px;
+    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .hist-chip:hover {
-    border-color: var(--color-primary-500);
+  .hist-chip .p-button-label {
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .p-button.hist-chip:hover:not(:disabled) {
+    border-color: var(--color-primary-300);
     background-color: var(--color-primary-50);
-    color: var(--color-primary-700);
+    color: var(--color-ink-900);
   }
 
   /* Табы-папки: активная вкладка сливается с контентом под шапкой */
