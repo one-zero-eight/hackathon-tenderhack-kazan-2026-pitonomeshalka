@@ -7,13 +7,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from psycopg import Error as DatabaseError
-from psycopg_pool import PoolTimeout
+from sqlalchemy.exc import SQLAlchemyError
 
 from experiments import classifier_experiments as ce
 from experiments.embedding_retrieval import MeowEmbedClient
 
 from backend.src.routes import router
-from backend.src.service import InferenceFailure, InvalidPlan, ModelBusy, PipelineService, load_catalog
+from backend.src.service import InferenceFailure, InvalidPlan, ModelBusy, PipelineService
 from backend.src.settings import Settings
 from backend.src.startup import check_connections
 from backend.src.storage import PostgresStore
@@ -47,7 +47,7 @@ def invalid_plan_handler(request: Request, error: InvalidPlan) -> JSONResponse:
 def create_app(
     settings: Settings | None = None,
     *,
-    catalog_loader=load_catalog,
+
     client_factory=ce.ClassifierClient,
     embedding_client_factory=MeowEmbedClient,
     store_factory=PostgresStore,
@@ -62,14 +62,11 @@ def create_app(
             application.state.startup_connections = await check_connections(
                 configuration, client_factory, embedding_client_factory, store,
             )
-            catalog = await run_in_threadpool(store.get_catalog, configuration.catalog_key)
-            if catalog is None:
-                catalog = await run_in_threadpool(catalog_loader, configuration)
-                await run_in_threadpool(store.save_catalog, catalog, configuration.catalog_key)
-                logging.getLogger("uvicorn.error").info("Catalog imported into PostgreSQL: positions=%d facts=%d",
-                                                       len(catalog["positions"]), len(catalog["facts"]))
-            application.state.pipeline = PipelineService(configuration, catalog, client_factory,
-                                                          embedding_client_factory, store=store)
+            active = await run_in_threadpool(store.get_active_import, configuration.catalog_key)
+            if active is None:
+                logging.getLogger("uvicorn.error").warning("No active catalogue; run scripts/load_db.py --activate %s", configuration.catalog_key)
+            application.state.pipeline = PipelineService(configuration, client_factory,
+                                                        embedding_client_factory, store=store)
             yield
         finally:
             await run_in_threadpool(store.close)
@@ -88,7 +85,7 @@ def create_app(
         logging.getLogger("uvicorn.error").exception("PostgreSQL request failed")
         return JSONResponse(status_code=503, content={"detail": {"error": "Database unavailable"}})
     application.add_exception_handler(DatabaseError, database_error_handler)
-    application.add_exception_handler(PoolTimeout, database_error_handler)
+    application.add_exception_handler(SQLAlchemyError, database_error_handler)
     application.include_router(router)
     return application
 
