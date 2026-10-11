@@ -1,6 +1,10 @@
 # Created by https://www.toptal.com/developers/gitignore/api/vs,pycharm+all,python,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=vs,pycharm+all,python,macos
 
+# Local presentation and screenshot artifacts
+docs/presentation/
+gui-test-screenshots/
+
 ### macOS ###
 # General
 .DS_Store
