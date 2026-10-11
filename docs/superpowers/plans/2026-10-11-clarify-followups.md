@@ -14,7 +14,7 @@
 
 - LLM только мапит свободный ответ на option_id текущего вопроса; коды и значения не придумывает.
 - Ответы на обязательные характеристики не сужают множество кодов и не учитываются в лимите 3 уточняющих раундов.
-- Порядок кандидатов в ответе = порядок бэкенда (retrieval), сортировки нет.
+- Порядок кандидатов: группировка по статусу (✓ compatible → ! uncertain → ✕ rejected), внутри группы — по числу несопоставленных свойств по убыванию; полные связи — порядок анализа (стабильная сортировка).
 - История поиска пишется один раз на новый анализ (новый run_id).
 - Обратная совместимость: старые сохранённые результаты и артефакты читаются.
 
@@ -32,7 +32,7 @@
 **Files:**
 - Modify: `frontend/src/components/TextSearchPanel.vue` (watch(searchPhase) → watch по `searchResult?.run_id`)
 - Test: `frontend/src/components/TextSearchPanel.test.ts`
-- Modify: `backend/src/presentation.py` (удалить priority/sort)
+- Modify: `backend/src/presentation.py` (сортировка по статусу, затем по числу несопоставленных свойств по убыванию)
 - Test: `backend/tests/test_clarify_api.py` (тесты порядка кандидатов)
 
 **Interfaces:**
