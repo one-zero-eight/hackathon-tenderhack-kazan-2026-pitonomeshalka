@@ -458,5 +458,5 @@ plans/
 .example.env
 .env.example
 
-presentation/*
-gui-test-screenshots/*
+*/presentation/*
+*/gui-test-screenshots/*
