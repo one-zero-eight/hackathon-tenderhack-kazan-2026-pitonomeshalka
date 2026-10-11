@@ -4,7 +4,7 @@ import type { AnalysisResponse } from '../api/types'
 import { mountWithPrime } from '../test/mount'
 import CsvBatchPanel from './CsvBatchPanel.vue'
 
-const csv = 'id;наименование\n1;аккумуляторная дрель\n2;садовый насос\n3;   \n'
+const csv = 'аккумуляторная дрель;18 В;реверс\nсадовый насос;500 Вт\n   \n'
 
 const analysisFor = (text: string): AnalysisResponse => ({
   run_id: `run-${text}`,
@@ -26,7 +26,7 @@ async function pickFile(wrapper: Awaited<ReturnType<typeof mountWithPrime>>, con
 }
 
 describe('CsvBatchPanel', () => {
-  it('previews the parsed table with the guessed query column', async () => {
+  it('previews complete physical lines without a column selector', async () => {
     const wrapper = mountWithPrime(CsvBatchPanel, {
       props: {
         analyze: async (text: string) => analysisFor(text),
@@ -35,10 +35,8 @@ describe('CsvBatchPanel', () => {
     })
     await pickFile(wrapper)
     expect(wrapper.text()).toContain('rows.csv')
-    expect(wrapper.text()).toContain('наименование')
-    expect(wrapper.text()).toContain('аккумуляторная дрель')
-    const select = wrapper.find('[data-test="column"]').element as HTMLSelectElement
-    expect(select.value).toBe('1')
+    expect(wrapper.text()).toContain('аккумуляторная дрель;18 В;реверс')
+    expect(wrapper.find('[data-test="column"]').exists()).toBe(false)
   })
 
   it('streams finished rows into the accordion list', async () => {
@@ -51,20 +49,23 @@ describe('CsvBatchPanel', () => {
     await flushPromises()
     await flushPromises()
     expect(analyze).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('аккумуляторная дрель@v')
-    expect(wrapper.text()).toContain('садовый насос@v')
+    expect(wrapper.text()).toContain('аккумуляторная дрель;18 В;реверс@v')
+    expect(wrapper.text()).toContain('садовый насос;500 Вт@v')
     expect(wrapper.text()).toContain('Проверено 2 из 2')
   })
 
   it('runs spell correction before the search', async () => {
     const analyze = vi.fn(async (text: string) => analysisFor(text))
-    const correct = vi.fn(async (text: string) => `${text} 18 В`)
+    const correct = vi.fn(async (text: string) => `${text};уточнено`)
     const wrapper = mountWithPrime(CsvBatchPanel, { props: { analyze, correct } })
     await pickFile(wrapper)
     await wrapper.find('[data-test="start"]').trigger('click')
     await flushPromises()
     await flushPromises()
-    expect(analyze).toHaveBeenCalledWith('аккумуляторная дрель 18 В', expect.anything())
+    expect(analyze).toHaveBeenCalledWith(
+      'аккумуляторная дрель;18 В;реверс;уточнено',
+      expect.anything(),
+    )
     expect(wrapper.text()).toContain('Исправлено')
   })
 
@@ -110,7 +111,7 @@ describe('CsvBatchPanel', () => {
       const analyzeCalls = fetchMock.mock.calls.filter(([url]) => url.includes('/api/analyze'))
       expect(analyzeCalls).toHaveLength(2)
       const texts = analyzeCalls.map(([, init]) => JSON.parse(init.body as string).text)
-      expect(texts).toEqual(['аккумуляторная дрель', 'садовый насос'])
+      expect(texts).toEqual(['аккумуляторная дрель;18 В;реверс', 'садовый насос;500 Вт'])
       expect(wrapper.text()).toContain('Проверено 2 из 2')
     } finally {
       vi.unstubAllGlobals()
@@ -122,18 +123,8 @@ describe('CsvBatchPanel', () => {
       props: { analyze: async (text: string) => analysisFor(text), correct: async () => null },
     })
     await pickFile(wrapper, '')
-    expect(wrapper.find('[data-test="file-error"]').text()).toContain('нет строк данных')
+    expect(wrapper.find('[data-test="file-error"]').text()).toContain('нет строк с описаниями')
     expect(wrapper.find('[data-test="start"]').exists()).toBe(false)
-  })
-
-  it('shows a visible error when the chosen column has no non-empty cells', async () => {
-    const analyze = vi.fn(async (text: string) => analysisFor(text))
-    const wrapper = mountWithPrime(CsvBatchPanel, { props: { analyze, correct: async () => null } })
-    await pickFile(wrapper, 'код;описание\n1;\n2;\n')
-    await wrapper.find('[data-test="start"]').trigger('click')
-    await flushPromises()
-    expect(analyze).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-test="file-error"]').text()).toContain('непустой')
   })
 
   it('shows a visible error when the file cannot be read', async () => {
@@ -149,22 +140,17 @@ describe('CsvBatchPanel', () => {
     expect(wrapper.find('[data-test="file-error"]').text()).toContain('Не удалось прочитать')
   })
 
-  it('accepts a headerless single-row csv and analyzes the chosen column', async () => {
+  it('sends the complete test.csv-style line as one description', async () => {
     const analyze = vi.fn(async (text: string) => analysisFor(text))
     const wrapper = mountWithPrime(CsvBatchPanel, { props: { analyze, correct: async () => null } })
-    await pickFile(
-      wrapper,
+    const line =
       'Отвертка аккумуляторная Bort BAS-48N-Lt,КИТАЙ,' +
-        'Вес 900 г | Высота упаковки 200 мм | Глубина упаковки 240 мм | Цвет синий',
-    )
+      'Вес 900 г | Высота упаковки 200 мм | Глубина упаковки 240 мм | Цвет синий'
+    await pickFile(wrapper, line)
     expect(wrapper.text()).toContain('строк: 1')
-    await wrapper.find('[data-test="column"]').setValue('0')
     await wrapper.find('[data-test="start"]').trigger('click')
     await flushPromises()
     await flushPromises()
-    expect(analyze).toHaveBeenCalledWith(
-      'Отвертка аккумуляторная Bort BAS-48N-Lt',
-      expect.anything(),
-    )
+    expect(analyze).toHaveBeenCalledWith(line, expect.anything())
   })
 })

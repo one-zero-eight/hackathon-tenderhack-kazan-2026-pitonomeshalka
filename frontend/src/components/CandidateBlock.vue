@@ -11,10 +11,9 @@ const ACTIONS: Record<ExtraAction, string> = {
   additional_field_policy_unknown: 'правило неизвестно',
 }
 
-const MISSING_CHIP = 'chip border border-accent-200 bg-accent-50 text-accent-700'
+const MISSING_CHIP = 'chip chip-missing'
 
-const CODE_CHIP =
-  'mt-1 inline-block bg-primary-50 px-1.5 py-0.5 font-mono text-xs break-all text-primary-600'
+const CODE_CHIP = 'code-stamp mt-1'
 </script>
 
 <template>

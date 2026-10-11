@@ -16,7 +16,7 @@ defineProps<{ item: BatchItem; index: number }>()
     <AccordionPanel :value="String(item.id)">
       <AccordionHeader>
         <span class="flex w-full min-w-0 items-center gap-3 pr-2">
-          <span class="font-mono text-xs text-ink-400 tabular-nums">{{ index + 1 }}</span>
+          <span class="font-mono text-xs text-ink-500 tabular-nums">{{ index + 1 }}</span>
           <span class="truncate text-sm font-semibold text-ink-900">{{ item.query }}</span>
           <span class="ml-auto flex shrink-0 items-center gap-2">
             <template v-if="item.status === 'searching'">
@@ -30,11 +30,11 @@ defineProps<{ item: BatchItem; index: number }>()
             <span class="text-xs font-semibold text-accent-700" v-else-if="item.status === 'error'">
               Ошибка
             </span>
-            <span class="text-xs text-ink-400" v-else>В очереди</span>
+            <span class="text-xs text-ink-500" v-else>В очереди</span>
           </span>
         </span>
         <template #toggleicon>
-          <svg class="h-4 w-4 text-ink-400" fill="none" viewBox="0 0 20 20">
+          <svg class="h-4 w-4 text-ink-500" fill="none" viewBox="0 0 20 20">
             <path
               d="m6 8 4 4 4-4"
               stroke="currentColor"
@@ -52,7 +52,7 @@ defineProps<{ item: BatchItem; index: number }>()
           </p>
           <AnalysisResult v-if="item.status === 'done' && item.result" :result="item.result" />
           <p class="text-sm text-accent-700" v-if="item.status === 'error'">{{ item.error }}</p>
-          <p class="text-sm text-ink-400" v-else-if="item.status === 'pending'">
+          <p class="text-sm text-ink-500" v-else-if="item.status === 'pending'">
             Ожидает очереди проверки…
           </p>
         </div>
