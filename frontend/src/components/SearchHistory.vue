@@ -11,6 +11,7 @@ const emit = defineEmits<{
 
 const BUTTON_MAX_CHARS = 50
 const TOOLTIP_MAX_CHARS = 150
+const TOOLTIP_SHOW_DELAY_MS = 700
 
 function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) + '…' : text
@@ -24,6 +25,11 @@ function tooltipText(query: string): string {
   if (query.length <= BUTTON_MAX_CHARS) return ''
   return truncate(query, TOOLTIP_MAX_CHARS)
 }
+
+function tooltipOptions(query: string) {
+  const value = tooltipText(query)
+  return value ? { value, showDelay: TOOLTIP_SHOW_DELAY_MS } : undefined
+}
 </script>
 
 <template>
@@ -32,7 +38,7 @@ function tooltipText(query: string): string {
     <Button
       class="hist-chip"
       v-for="(query, i) in props.queries"
-      v-tooltip.top="tooltipText(query) || undefined"
+      v-tooltip.top="tooltipOptions(query)"
       :key="`${query}-${i}`"
       :label="displayText(query)"
       @click="emit('select', query)"
