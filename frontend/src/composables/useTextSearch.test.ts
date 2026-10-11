@@ -125,7 +125,7 @@ describe('useTextSearch.clarify', () => {
 
 describe('useTextSearch', () => {
   it('moves from searching to done and stores the result', async () => {
-    const api = { analyze: vi.fn(async () => analysis) }
+    const api = { analyze: vi.fn(async () => analysis), clarify: vi.fn(async () => analysis) }
     const search = useTextSearch(api)
     const running = search.search('дрель 18 В')
     expect(search.phase.value).toBe('searching')
@@ -136,14 +136,22 @@ describe('useTextSearch', () => {
   })
 
   it('passes the chosen scope to the backend', async () => {
-    const api = { analyze: vi.fn(async () => analysis) }
+    const api = { analyze: vi.fn(async () => analysis), clarify: vi.fn(async () => analysis) }
     const search = useTextSearch(api)
     await search.search('дрель', 'tools')
     expect(api.analyze).toHaveBeenCalledWith({ text: 'дрель', scope: 'tools' })
   })
 
+  it('sends an explicit top_k only when the caller asks for an expanded search', async () => {
+    const api = { analyze: vi.fn(async () => analysis), clarify: vi.fn(async () => analysis) }
+    const search = useTextSearch(api)
+    await search.search('дрель', 'all', 12)
+    expect(api.analyze).toHaveBeenCalledWith({ text: 'дрель', scope: 'all', top_k: 12 })
+    expect(api.analyze).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects an empty query without calling the backend', async () => {
-    const api = { analyze: vi.fn(async () => analysis) }
+    const api = { analyze: vi.fn(async () => analysis), clarify: vi.fn(async () => analysis) }
     const search = useTextSearch(api)
     await search.search('   ')
     expect(search.phase.value).toBe('error')
@@ -155,6 +163,7 @@ describe('useTextSearch', () => {
       analyze: vi.fn(async () => {
         throw Object.assign(new Error('Another model request is running'), { status: 503 })
       }),
+      clarify: vi.fn(async () => analysis),
     }
     const search = useTextSearch(api)
     await search.search('дрель')
@@ -168,6 +177,7 @@ describe('useTextSearch', () => {
       analyze: vi.fn(async () => {
         throw Object.assign(new Error('Nimble failed'), { status: 502, partialResult: partial })
       }),
+      clarify: vi.fn(async () => analysis),
     }
     const search = useTextSearch(api)
     await search.search('дрель')
@@ -176,7 +186,7 @@ describe('useTextSearch', () => {
   })
 
   it('reset returns the state to idle', async () => {
-    const api = { analyze: vi.fn(async () => analysis) }
+    const api = { analyze: vi.fn(async () => analysis), clarify: vi.fn(async () => analysis) }
     const search = useTextSearch(api)
     await search.search('дрель')
     search.reset()

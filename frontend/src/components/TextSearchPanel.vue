@@ -24,6 +24,11 @@ const props = withDefaults(
 
 const MAX_LENGTH = 10000
 
+/** Mirrors the backend .env default (PIPELINE_TOP_K) and its schema cap (le=32). */
+const DEFAULT_TOP_K = 8
+const EXPAND_STEP = 4
+const MAX_TOP_K = 32
+
 const SELECT_CLASS = 'field-base text-sm'
 const TEXTAREA_CLASS = 'field-base w-full resize-y px-4 py-3 text-[15px] leading-relaxed transition'
 const ERROR_CARD =
@@ -31,6 +36,7 @@ const ERROR_CARD =
 
 const text = ref('')
 const scope = ref<AnalysisScope>('all')
+const topK = ref(DEFAULT_TOP_K)
 const spell = useSpellcheck(props.spellcheck ?? lt, { debounceMs: 300 })
 const searchState = useTextSearch(props.search ?? api)
 const { matches, checkedText, checking, error: spellError } = spell
@@ -82,8 +88,18 @@ function applyOne(index: number, replacement: string) {
   text.value = spell.applyOne(index, replacement)
 }
 
-function run() {
-  void searchState.search(text.value, scope.value)
+function run(expandedTopK?: number) {
+  void searchState.search(text.value, scope.value, expandedTopK)
+}
+
+function choose(optionId: string) {
+  void searchState.clarify(optionId)
+}
+
+/** Repeats the search with more candidates; the backend accepts at most 32. */
+function expand() {
+  topK.value = Math.min(topK.value + EXPAND_STEP, MAX_TOP_K)
+  run(topK.value)
 }
 </script>
 
@@ -119,7 +135,7 @@ function run() {
           class="btn-cta ml-auto"
           :disabled="!text.trim() || searchPhase === 'searching'"
           :loading="searchPhase === 'searching'"
-          @click="run"
+          @click="run()"
           data-test="search"
           size="large"
         >
@@ -145,9 +161,14 @@ function run() {
     <div v-else-if="searchPhase === 'error'" :class="ERROR_CARD" data-test="error">
       <p class="font-medium">Не удалось выполнить анализ</p>
       <p>{{ searchError }}</p>
-      <Button @click="run" label="Повторить" severity="secondary" size="small" />
+      <Button @click="run()" label="Повторить" severity="secondary" size="small" />
     </div>
 
-    <AnalysisResult v-else-if="searchResult" :result="searchResult" />
+    <AnalysisResult
+      v-else-if="searchResult"
+      :result="searchResult"
+      @expand="expand"
+      @select="choose"
+    />
   </section>
 </template>

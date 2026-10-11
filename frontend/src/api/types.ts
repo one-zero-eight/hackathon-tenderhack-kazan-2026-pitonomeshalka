@@ -90,6 +90,7 @@ export interface FinalCard {
   version: string
   name: string
   status: string
+  updated?: string | null
   applies_from?: string | null
   applies_to?: string | null
   units: string[]

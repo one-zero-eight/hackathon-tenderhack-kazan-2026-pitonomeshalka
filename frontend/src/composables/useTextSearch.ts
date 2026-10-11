@@ -3,8 +3,7 @@ import type { AnalysisRequest, AnalysisResponse, AnalysisScope, ClarifyRequest }
 
 export interface TextSearchClient {
   analyze(request: AnalysisRequest): Promise<AnalysisResponse>
-  /** Optional until the UI passes clarification-capable clients everywhere. */
-  clarify?(request: ClarifyRequest): Promise<AnalysisResponse>
+  clarify(request: ClarifyRequest): Promise<AnalysisResponse>
 }
 
 export type SearchPhase = 'idle' | 'searching' | 'done' | 'error'
@@ -17,7 +16,7 @@ export function useTextSearch(client: TextSearchClient) {
   const result = ref<AnalysisResponse | null>(null)
   const error = ref<string | null>(null)
 
-  async function search(text: string, scope: AnalysisScope = 'all'): Promise<void> {
+  async function search(text: string, scope: AnalysisScope = 'all', topK?: number): Promise<void> {
     if (!text.trim()) {
       phase.value = 'error'
       error.value = 'Введите описание товара'
@@ -25,8 +24,10 @@ export function useTextSearch(client: TextSearchClient) {
     }
     phase.value = 'searching'
     error.value = null
+    const request: AnalysisRequest = { text, scope }
+    if (topK !== undefined) request.top_k = topK
     try {
-      result.value = await client.analyze({ text, scope })
+      result.value = await client.analyze(request)
       phase.value = 'done'
     } catch (cause) {
       const partial = (cause as { partialResult?: AnalysisResponse } | null)?.partialResult
@@ -39,7 +40,7 @@ export function useTextSearch(client: TextSearchClient) {
   /** Answers the current clarification question; keeps the same state machine as search. */
   async function clarify(optionId: string): Promise<void> {
     const current = result.value
-    if (!current?.clarification || !client.clarify) {
+    if (!current?.clarification) {
       phase.value = 'error'
       error.value = NO_CLARIFICATION_MESSAGE
       return

@@ -1,11 +1,16 @@
 <script lang="ts" setup>
+import Button from 'primevue/button'
 import { computed } from 'vue'
 import type { AnalysisResponse } from '../api/types'
 import CandidateBlock from './CandidateBlock.vue'
+import ClarificationPanel from './ClarificationPanel.vue'
+import FinalKtruCard from './FinalKtruCard.vue'
 import PropertiesTable from './PropertiesTable.vue'
 import StatusChip from './ui/StatusChip.vue'
 
 const props = defineProps<{ result: AnalysisResponse }>()
+
+const emit = defineEmits<{ expand: []; select: [optionId: string] }>()
 
 const recommended = computed(() => {
   const code = props.result.recommended_candidate
@@ -18,6 +23,9 @@ const recommended = computed(() => {
 
 const WARNINGS_CLASS =
   'card-registry border-l-4 border-l-warning-500 bg-warning-50 p-4 text-warning-700'
+
+const EXPAND_HINT =
+  'Подходящей позиции в коротком списке не нашлось. Запустите расширенный поиск — система проверит больше кандидатов КТРУ.'
 </script>
 
 <template>
@@ -69,6 +77,30 @@ const WARNINGS_CLASS =
         <li v-for="warning in result.warnings" :key="warning">{{ warning }}</li>
       </ul>
     </div>
+
+    <ClarificationPanel
+      v-if="result.clarification"
+      :clarification="result.clarification"
+      :suggest-expand="result.suggest_expand"
+      @select="emit('select', $event)"
+    />
+
+    <div
+      class="card-registry space-y-2 border-warning-200 bg-warning-50 p-4 text-sm text-warning-700"
+      v-else-if="result.suggest_expand"
+      data-test="expand-hint"
+    >
+      <p>{{ EXPAND_HINT }}</p>
+      <Button
+        @click="emit('expand')"
+        data-test="expand"
+        label="Расширенный поиск"
+        severity="secondary"
+        size="small"
+      />
+    </div>
+
+    <FinalKtruCard v-if="result.final_card" :card="result.final_card" />
 
     <div class="space-y-3">
       <h3 class="eyebrow border-b border-ink-200 pb-2">

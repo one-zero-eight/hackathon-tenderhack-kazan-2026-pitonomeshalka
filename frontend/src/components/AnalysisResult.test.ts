@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AnalysisResponse, Candidate } from '../api/types'
+import type { AnalysisResponse, Candidate, Clarification, FinalCard } from '../api/types'
 import { mountWithPrime } from '../test/mount'
 import AnalysisResult from './AnalysisResult.vue'
 
@@ -23,6 +23,32 @@ const result: AnalysisResponse = {
   candidates: [candidate],
   clarifying_question: 'Какое напряжение батареи требуется?',
   warnings: ['Порог принятия не откалиброван'],
+}
+
+const clarification: Clarification = {
+  question_id: 'clarification_q1',
+  kind: 'product',
+  question: 'Выберите вид товара.',
+  manual_choice: false,
+  options: [
+    {
+      id: 'option_a',
+      text: 'Дрель аккумуляторная',
+      candidate_codes: ['26.02.10.110-00000001'],
+      suggest_expand: false,
+    },
+  ],
+}
+
+const finalCard: FinalCard = {
+  code: '25.73.011.111-00000001',
+  version: '3',
+  name: 'Отвёртка аккумуляторная',
+  status: 'ACTIVE',
+  units: ['шт'],
+  characteristics: [],
+  rationale: 'Пользователь выбрал вариант option_a и тем самым сузил множество кандидатов.',
+  requires_review: true,
 }
 
 describe('AnalysisResult', () => {
@@ -76,5 +102,47 @@ describe('AnalysisResult', () => {
     expect(wrapper.text()).toContain('Доска магнитно-маркерная')
     expect(wrapper.text()).toContain('Вид товара не подтверждён описанием.')
     expect(wrapper.text()).toContain('32.99.53.130-00000001')
+  })
+
+  it('renders the final card with its code when the run is resolved', () => {
+    const wrapper = mountWithPrime(AnalysisResult, {
+      props: { result: { ...result, final_card: finalCard } },
+    })
+    expect(wrapper.find('[data-test="final-card"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('25.73.011.111-00000001')
+    expect(wrapper.text()).toContain('Требует финальной проверки специалистом')
+  })
+
+  it('renders the clarification question and proxies the chosen option up', async () => {
+    const wrapper = mountWithPrime(AnalysisResult, {
+      props: {
+        result: {
+          ...result,
+          recommended_candidate: null,
+          status: 'needs_clarification',
+          clarification,
+        },
+      },
+    })
+    expect(wrapper.find('[data-test="clarification"]').exists()).toBe(true)
+    await wrapper.findAll('[data-test="option"]')[0].trigger('click')
+    expect(wrapper.emitted('select')).toEqual([['option_a']])
+  })
+
+  it('offers the expanded search when nothing matched and there is no question', async () => {
+    const wrapper = mountWithPrime(AnalysisResult, {
+      props: {
+        result: {
+          ...result,
+          recommended_candidate: null,
+          status: 'needs_clarification',
+          suggest_expand: true,
+          clarification: undefined,
+        },
+      },
+    })
+    expect(wrapper.text()).toContain('расширенный поиск')
+    await wrapper.find('[data-test="expand"]').trigger('click')
+    expect(wrapper.emitted('expand')).toHaveLength(1)
   })
 })

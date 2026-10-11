@@ -15,13 +15,37 @@ const analysis: AnalysisResponse = {
   warnings: [],
 }
 
+const clarificationResult: AnalysisResponse = {
+  ...analysis,
+  status: 'needs_clarification',
+  recommended_candidate: null,
+  clarification: {
+    question_id: 'q1',
+    kind: 'product',
+    question: 'Выберите вид товара.',
+    manual_choice: false,
+    options: [
+      {
+        id: 'option_a',
+        text: 'Дрель аккумуляторная',
+        candidate_codes: ['26.02.10.110-00000001'],
+        suggest_expand: false,
+      },
+    ],
+  },
+}
+
+function fakeSearch(impl: () => Promise<AnalysisResponse>) {
+  return { analyze: vi.fn(impl), clarify: vi.fn(async () => analysis) }
+}
+
 const quietSpellcheck = {
   check: vi.fn(async (text: string) => ({ text, language: 'ru', matches: [] })),
 }
 
 describe('TextSearchPanel', () => {
   it('searches from the textarea and renders the result', async () => {
-    const search = { analyze: vi.fn(async () => analysis) }
+    const search = fakeSearch(async () => analysis)
     const wrapper = mountWithPrime(TextSearchPanel, {
       props: { spellcheck: quietSpellcheck, search },
     })
@@ -34,7 +58,7 @@ describe('TextSearchPanel', () => {
   })
 
   it('passes the selected scope to the backend', async () => {
-    const search = { analyze: vi.fn(async () => analysis) }
+    const search = fakeSearch(async () => analysis)
     const wrapper = mountWithPrime(TextSearchPanel, {
       props: { spellcheck: quietSpellcheck, search },
     })
@@ -46,7 +70,7 @@ describe('TextSearchPanel', () => {
   })
 
   it('offers only clothing, tools and furniture as selectable scopes', () => {
-    const search = { analyze: vi.fn(async () => analysis) }
+    const search = fakeSearch(async () => analysis)
     const wrapper = mountWithPrime(TextSearchPanel, {
       props: { spellcheck: quietSpellcheck, search },
     })
@@ -63,7 +87,7 @@ describe('TextSearchPanel', () => {
   })
 
   it('disables search while the query is empty', async () => {
-    const search = { analyze: vi.fn(async () => analysis) }
+    const search = fakeSearch(async () => analysis)
     const wrapper = mountWithPrime(TextSearchPanel, {
       props: { spellcheck: quietSpellcheck, search },
     })
@@ -83,6 +107,7 @@ describe('TextSearchPanel', () => {
             resolve = res
           }),
       ),
+      clarify: vi.fn(async () => analysis),
     }
     const wrapper = mountWithPrime(TextSearchPanel, {
       props: { spellcheck: quietSpellcheck, search },
@@ -98,13 +123,87 @@ describe('TextSearchPanel', () => {
     expect(wrapper.find('[data-test="result"]').exists()).toBe(true)
   })
 
+  it('sends the chosen clarification option to the backend', async () => {
+    const search = fakeSearch(async () => clarificationResult)
+    const wrapper = mountWithPrime(TextSearchPanel, {
+      props: { spellcheck: quietSpellcheck, search },
+    })
+    await wrapper.find('textarea').setValue('дрель')
+    await wrapper.find('[data-test="search"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-test="option"]').trigger('click')
+    await flushPromises()
+    expect(search.clarify).toHaveBeenCalledWith({
+      run_id: 'r1',
+      question_id: 'q1',
+      option_id: 'option_a',
+    })
+    expect(wrapper.find('[data-test="result"]').exists()).toBe(true)
+  })
+
+  it('shows the robot while the clarification answer is in flight', async () => {
+    let resolve!: (value: AnalysisResponse) => void
+    const search = {
+      analyze: vi.fn(async () => clarificationResult),
+      clarify: vi.fn(
+        () =>
+          new Promise<AnalysisResponse>((res) => {
+            resolve = res
+          }),
+      ),
+    }
+    const wrapper = mountWithPrime(TextSearchPanel, {
+      props: { spellcheck: quietSpellcheck, search },
+    })
+    await wrapper.find('textarea').setValue('дрель')
+    await wrapper.find('[data-test="search"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="option"]').exists()).toBe(true)
+    await wrapper.find('[data-test="option"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="robot"]').exists()).toBe(true)
+    resolve(analysis)
+    await flushPromises()
+    expect(wrapper.find('[data-test="result"]').exists()).toBe(true)
+  })
+
+  it('repeats the search with a larger top_k when the user asks for more options', async () => {
+    const search = fakeSearch(async () => ({ ...analysis, suggest_expand: true }))
+    const wrapper = mountWithPrime(TextSearchPanel, {
+      props: { spellcheck: quietSpellcheck, search },
+    })
+    await wrapper.find('textarea').setValue('дрель')
+    await wrapper.find('[data-test="search"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-test="expand"]').trigger('click')
+    await flushPromises()
+    expect(search.analyze).toHaveBeenLastCalledWith({ text: 'дрель', scope: 'all', top_k: 12 })
+  })
+
+  it('caps the expanded top_k at the backend limit', async () => {
+    const search = fakeSearch(async () => ({ ...analysis, suggest_expand: true }))
+    const wrapper = mountWithPrime(TextSearchPanel, {
+      props: { spellcheck: quietSpellcheck, search },
+    })
+    await wrapper.find('textarea').setValue('дрель')
+    await wrapper.find('[data-test="search"]').trigger('click')
+    await flushPromises()
+    for (let round = 0; round < 7; round += 1) {
+      await wrapper.find('[data-test="expand"]').trigger('click')
+      await flushPromises()
+    }
+    const calls = search.analyze.mock.calls as { top_k?: number }[][]
+    expect(calls.at(-1)?.[0]?.top_k).toBe(32)
+    expect(calls.at(-2)?.[0]?.top_k).toBe(32)
+  })
+
   it('stays usable when LanguageTool is down', async () => {
     const spell = {
       check: vi.fn(async () => {
         throw new Error('lt down')
       }),
     }
-    const search = { analyze: vi.fn(async () => analysis) }
+    const search = fakeSearch(async () => analysis)
     const wrapper = mountWithPrime(TextSearchPanel, { props: { spellcheck: spell, search } })
     await wrapper.find('textarea').setValue('дрел с трещотой')
     await vi.waitFor(() => {
@@ -135,7 +234,7 @@ describe('TextSearchPanel', () => {
         ],
       })),
     }
-    const search = { analyze: vi.fn(async () => analysis) }
+    const search = fakeSearch(async () => analysis)
     const wrapper = mountWithPrime(TextSearchPanel, { props: { spellcheck: spell, search } })
     await wrapper.find('textarea').setValue('дрел')
     await vi.waitFor(() => {
