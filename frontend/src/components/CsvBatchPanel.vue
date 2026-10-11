@@ -42,6 +42,7 @@ const fileName = ref('')
 const table = ref<CsvTable | null>(null)
 const queryColumn = ref(0)
 const dragging = ref(false)
+const fileError = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const DROPZONE =
@@ -61,8 +62,20 @@ const progressPercent = computed(() =>
 
 async function onFile(file: File | null | undefined) {
   if (!file) return
-  const parsed = parseTable(await file.text())
-  if (parsed.rows.length === 0) return
+  fileError.value = ''
+  let parsed: CsvTable
+  try {
+    parsed = parseTable(await file.text())
+  } catch {
+    fileError.value = 'Не удалось прочитать файл'
+    return
+  }
+  if (parsed.rows.length === 0) {
+    table.value = null
+    fileName.value = ''
+    fileError.value = 'В файле нет строк данных — нужна шапка и хотя бы одна строка'
+    return
+  }
   fileName.value = file.name
   table.value = parsed
   queryColumn.value = guessQueryColumn(parsed.headers, parsed.rows)
@@ -87,7 +100,11 @@ function startBatch() {
   const rows: BatchRow[] = table.value.rows
     .map((row, index) => ({ id: index, query: rowToQuery(row, queryColumn.value) }))
     .filter((row) => row.query.length > 0)
-  if (rows.length === 0) return
+  if (rows.length === 0) {
+    fileError.value = 'В выбранном столбце нет ни одной непустой ячейки — выберите другой столбец'
+    return
+  }
+  fileError.value = ''
   ltFailed.value = false
   batch.start(rows)
 }
@@ -95,6 +112,7 @@ function startBatch() {
 function reset() {
   table.value = null
   fileName.value = ''
+  fileError.value = ''
   batch.items.value = []
 }
 </script>
@@ -140,6 +158,10 @@ function reset() {
         <p class="text-xs text-ink-500">Поддерживаются разделители «;», «,» и табуляция</p>
         <Button @click.stop="pickFile" label="Выбрать файл" severity="secondary" size="small" />
       </div>
+
+      <p class="text-sm font-semibold text-accent-700" v-if="fileError" data-test="file-error">
+        {{ fileError }}
+      </p>
 
       <div class="card-registry space-y-3 bg-primary-50 p-4" v-if="table">
         <p class="text-sm font-semibold text-ink-900">{{ fileName }} — строк: {{ rowsCount }}</p>
