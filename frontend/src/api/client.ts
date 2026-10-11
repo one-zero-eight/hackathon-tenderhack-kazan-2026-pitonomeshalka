@@ -3,6 +3,7 @@ import { normalizeAnalysis } from './normalize'
 import type {
   AnalysisRequest,
   AnalysisResponse,
+  ClarifyRequest,
   HealthPayload,
   HistoryResponse,
   PreviewResponse,
@@ -81,6 +82,12 @@ export class KtruApiClient {
 
   async analyze(request: AnalysisRequest, signal?: AbortSignal): Promise<AnalysisResponse> {
     const result = await this.request<AnalysisResponse>('analyze', request, signal)
+    return normalizeAnalysis(result)
+  }
+
+  /** Answers the current clarification question; the response mirrors /analyze. */
+  async clarify(request: ClarifyRequest, signal?: AbortSignal): Promise<AnalysisResponse> {
+    const result = await this.request<AnalysisResponse>('clarify', request, signal)
     return normalizeAnalysis(result)
   }
 

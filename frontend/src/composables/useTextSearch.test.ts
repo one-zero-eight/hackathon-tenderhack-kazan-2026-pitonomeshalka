@@ -13,6 +13,116 @@ const analysis: AnalysisResponse = {
   warnings: [],
 }
 
+const needsClarification: AnalysisResponse = {
+  ...analysis,
+  status: 'needs_clarification',
+  recommended_candidate: null,
+  clarification: {
+    question_id: 'q1',
+    kind: 'product',
+    question: 'Какой вид отвёртки нужен?',
+    manual_choice: false,
+    options: [
+      {
+        id: 'opt-1',
+        text: 'Отвёртка аккумуляторная',
+        candidate_codes: ['26.20.10.000-00000001'],
+        suggest_expand: false,
+      },
+    ],
+  },
+}
+
+const clarified: AnalysisResponse = {
+  ...analysis,
+  status: 'ready_for_review',
+  final_card: {
+    code: '26.20.10.000-00000001',
+    version: '4',
+    name: 'Отвёртка аккумуляторная',
+    status: 'Действует',
+    units: ['796'],
+    characteristics: [
+      {
+        code: 'THE000001',
+        name: 'Тип питания',
+        required: true,
+        choice: 'выбор из значений',
+        choice_type: 1,
+        is_numeric: false,
+        units: [],
+        values: [{ value: 'аккумулятор' }],
+      },
+    ],
+    rationale: 'Вариант уточнения сузил множество кандидатов до одного кода.',
+    requires_review: true,
+  },
+  suggest_expand: false,
+  manual_choice: false,
+}
+
+describe('useTextSearch.clarify', () => {
+  it('moves from searching to done and stores the clarified result', async () => {
+    const api = {
+      analyze: vi.fn(async () => needsClarification),
+      clarify: vi.fn(async () => clarified),
+    }
+    const search = useTextSearch(api)
+    await search.search('отвёртка аккумуляторная')
+    expect(search.result.value?.clarification?.question_id).toBe('q1')
+    const running = search.clarify('opt-1')
+    expect(search.phase.value).toBe('searching')
+    await running
+    expect(search.phase.value).toBe('done')
+    expect(api.clarify).toHaveBeenCalledWith({
+      run_id: 'r1',
+      question_id: 'q1',
+      option_id: 'opt-1',
+    })
+    expect(search.result.value?.final_card?.code).toBe('26.20.10.000-00000001')
+  })
+
+  it('keeps the partial result delivered with a failed clarify', async () => {
+    const partial = { ...needsClarification, run_id: 'partial' }
+    const api = {
+      analyze: vi.fn(async () => needsClarification),
+      clarify: vi.fn(async () => {
+        throw Object.assign(new Error('Вопрос устарел'), { status: 409, partialResult: partial })
+      }),
+    }
+    const search = useTextSearch(api)
+    await search.search('отвёртка аккумуляторная')
+    await search.clarify('opt-1')
+    expect(search.phase.value).toBe('error')
+    expect(search.error.value).toBe('Вопрос устарел')
+    expect(search.result.value?.run_id).toBe('partial')
+  })
+
+  it('refuses to clarify when the current result has no question', async () => {
+    const api = {
+      analyze: vi.fn(async () => analysis),
+      clarify: vi.fn(async () => clarified),
+    }
+    const search = useTextSearch(api)
+    await search.search('дрель')
+    await search.clarify('opt-1')
+    expect(search.phase.value).toBe('error')
+    expect(api.clarify).not.toHaveBeenCalled()
+  })
+
+  it('refuses to clarify before any search', async () => {
+    const api = {
+      analyze: vi.fn(async () => analysis),
+      clarify: vi.fn(async () => clarified),
+    }
+    const search = useTextSearch(api)
+    await search.clarify('opt-1')
+    expect(search.phase.value).toBe('error')
+    expect(api.clarify).not.toHaveBeenCalled()
+    expect(api.analyze).not.toHaveBeenCalled()
+  })
+})
+
 describe('useTextSearch', () => {
   it('moves from searching to done and stores the result', async () => {
     const api = { analyze: vi.fn(async () => analysis) }

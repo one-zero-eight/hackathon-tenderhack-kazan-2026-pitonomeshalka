@@ -50,6 +50,54 @@ export interface AnalysisRequest {
   extras?: ExtraCharacteristicInput[]
 }
 
+export interface ClarificationOption {
+  id: string
+  text: string
+  candidate_codes: string[]
+  suggest_expand?: boolean
+}
+
+export type ClarificationKind = 'characteristic' | 'product'
+
+export interface Clarification {
+  question_id: string
+  kind: ClarificationKind
+  question: string
+  manual_choice: boolean
+  options: ClarificationOption[]
+}
+
+export interface ClarifyRequest {
+  run_id: string
+  question_id: string
+  option_id: string
+}
+
+export interface FinalCardCharacteristic {
+  code: string
+  name: string
+  required: boolean
+  choice: string
+  choice_type: number | null
+  is_numeric: boolean
+  units: string[]
+  values: Record<string, unknown>[]
+}
+
+/** Minimal KTRU position schema; the backend may send more catalogue fields. */
+export interface FinalCard {
+  code: string
+  version: string
+  name: string
+  status: string
+  applies_from?: string | null
+  applies_to?: string | null
+  units: string[]
+  characteristics: FinalCardCharacteristic[]
+  rationale: string
+  requires_review: true
+}
+
 export interface AnalysisResponse {
   run_id: string
   status: AnalysisStatus
@@ -59,6 +107,11 @@ export interface AnalysisResponse {
   candidates: Candidate[]
   clarifying_question: string | null
   warnings: string[]
+  /** Deterministic clarification extensions; the backend omits them when empty. */
+  clarification?: Clarification
+  final_card?: FinalCard
+  suggest_expand?: boolean
+  manual_choice?: boolean
 }
 
 export interface CandidateReference {

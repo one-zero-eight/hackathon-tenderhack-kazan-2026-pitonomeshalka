@@ -103,6 +103,140 @@ describe('KtruApiClient error handling', () => {
   })
 })
 
+const needsClarification: AnalysisResponse = {
+  ...analysis,
+  status: 'needs_clarification',
+  recommended_candidate: null,
+  clarification: {
+    question_id: 'q1',
+    kind: 'product',
+    question: 'Какой вид отвёртки нужен?',
+    manual_choice: false,
+    options: [
+      {
+        id: 'opt-1',
+        text: 'Отвёртка аккумуляторная',
+        candidate_codes: ['26.20.10.000-00000001'],
+        suggest_expand: false,
+      },
+    ],
+  },
+}
+
+const clarified: AnalysisResponse = {
+  ...analysis,
+  status: 'ready_for_review',
+  final_card: {
+    code: '26.20.10.000-00000001',
+    version: '4',
+    name: 'Отвёртка аккумуляторная',
+    status: 'Действует',
+    units: ['796'],
+    characteristics: [
+      {
+        code: 'THE000001',
+        name: 'Тип питания',
+        required: true,
+        choice: 'выбор из значений',
+        choice_type: 1,
+        is_numeric: false,
+        units: [],
+        values: [{ value: 'аккумулятор' }],
+      },
+    ],
+    rationale: 'Вариант уточнения сузил множество кандидатов до одного кода.',
+    requires_review: true,
+  },
+  suggest_expand: false,
+  manual_choice: false,
+}
+
+describe('KtruApiClient.clarify', () => {
+  it('posts the run, question and chosen option to /clarify', async () => {
+    const fetchFn = stubFetch(clarified)
+    const client = new KtruApiClient({ baseUrl: '/api', fetch: fetchFn })
+    const result = await client.clarify({
+      run_id: 'r1',
+      question_id: 'q1',
+      option_id: 'opt-1',
+    })
+    const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/clarify')
+    expect(init.method).toBe('POST')
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
+    expect(JSON.parse(init.body as string)).toEqual({
+      run_id: 'r1',
+      question_id: 'q1',
+      option_id: 'opt-1',
+    })
+    expect(result.final_card?.code).toBe('26.20.10.000-00000001')
+    expect(result.final_card?.requires_review).toBe(true)
+  })
+
+  it('fills the clarification arrays the backend omits when empty', async () => {
+    const sparse = {
+      run_id: 'r3',
+      status: 'needs_clarification',
+      complete_inference: true,
+      recommended_candidate: null,
+      properties: [],
+      candidates: [],
+      clarifying_question: null,
+      warnings: [],
+      clarification: {
+        question_id: 'product:r3',
+        kind: 'product',
+        question: 'Какой вид отвёртки нужен?',
+        manual_choice: false,
+        options: [
+          { id: 'opt-1', text: 'Отвёртка аккумуляторная' },
+          {
+            id: 'opt-2',
+            text: 'Ничего из перечисленного',
+            candidate_codes: [],
+            suggest_expand: true,
+          },
+        ],
+      },
+    }
+    const fetchFn = stubFetch(sparse)
+    const client = new KtruApiClient({ baseUrl: '/api', fetch: fetchFn })
+    const result = await client.clarify({
+      run_id: 'r3',
+      question_id: 'product:r3',
+      option_id: 'opt-1',
+    })
+    expect(result.clarification?.options[0].candidate_codes).toEqual([])
+    expect(result.clarification?.options[1].candidate_codes).toEqual([])
+    expect(result.suggest_expand).toBe(false)
+    expect(result.manual_choice).toBe(false)
+  })
+
+  it('exposes the backend error detail as the message', async () => {
+    const fetchFn = stubFetch({ detail: { error: 'Run is unknown' } }, 404)
+    const client = new KtruApiClient({ baseUrl: '/api', fetch: fetchFn })
+    const error = await client
+      .clarify({ run_id: 'nope', question_id: 'q1', option_id: 'opt-1' })
+      .catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).status).toBe(404)
+    expect((error as ApiError).message).toBe('Run is unknown')
+  })
+
+  it('keeps the partial result delivered with a failed clarify', async () => {
+    const fetchFn = stubFetch(
+      { detail: { error: 'Database is unavailable', result: needsClarification } },
+      503,
+    )
+    const client = new KtruApiClient({ baseUrl: '/api', fetch: fetchFn })
+    const error = await client
+      .clarify({ run_id: 'r1', question_id: 'q1', option_id: 'opt-1' })
+      .catch((e: unknown) => e)
+    expect((error as ApiError).status).toBe(503)
+    expect((error as ApiError).partialResult?.clarification?.question_id).toBe('q1')
+  })
+})
+
 describe('KtruApiClient.preview and health', () => {
   it('posts to /preview and returns the plan', async () => {
     const payload = { planned_requests: 2, planned_questions: 8, candidates: [] }
