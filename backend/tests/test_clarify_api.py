@@ -11,7 +11,9 @@ from sqlalchemy.dialects.postgresql import Range
 from backend.src.app import create_app
 from backend.src.clarify import CLARIFICATION_STATE, build_clarification, initial_candidate_codes
 from backend.src.models import KtruCharacteristic, KtruPosition, KtruValue
-from backend.src.presentation import with_primary_clarification
+from backend.src.pipeline import CandidateAssessment, Plan, Report
+from backend.src.presentation import analysis_response, with_primary_clarification
+from backend.src.retrieval import Retrieval
 from backend.src.schemas import AnalysisResponse, Clarification
 from backend.tests.memory_store import MemoryStore
 from experiments.classifier_experiments import identity
@@ -89,6 +91,11 @@ def card_position(code):
     ])
     position.characteristics.extend([characteristic])
     return position
+
+
+def assessment(code, status):
+    return CandidateAssessment(position=card_position(code), status=status, product_answer=None,
+                               findings=[], missing_required=[], unmatched=[], extras=[], reasons=[])
 
 
 class FakeUpstream:
@@ -306,6 +313,23 @@ class ClarifyApiTests(unittest.TestCase):
 
 
 class AnalyzeEnrichmentTests(unittest.TestCase):
+    def test_candidates_keep_the_report_order_without_status_sorting(self):
+        report = Report(
+            plan=Plan(text="Дрель", retrieval=Retrieval(IMPORT_SHA256, [], [], 0, False),
+                      hypotheses=[], bindings=[], spans=[], jobs=[]),
+            status="needs_clarification", complete_inference=True, recommended=None,
+            # Retrieval order: uncertain first, then compatible, then rejected.
+            candidates=[assessment("20", "uncertain"), assessment("10", "supported"),
+                        assessment("40", "rejected")],
+            properties=[], clarifying_question=None, warnings=[], answers={}, threshold=0.5,
+        )
+
+        response = analysis_response(report, RUN_ID)
+
+        self.assertEqual([candidate.code for candidate in response.candidates], ["20", "10", "40"])
+        self.assertEqual([candidate.status for candidate in response.candidates],
+                         ["uncertain", "compatible", "rejected"])
+
     def test_needs_clarification_response_gains_the_round_one_clarification(self):
         result = result_fixture()
         snapshot = deepcopy(result)
