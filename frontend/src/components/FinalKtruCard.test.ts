@@ -118,4 +118,22 @@ describe('FinalKtruCard', () => {
       'Требует финальной проверки специалистом',
     )
   })
+
+  it('omits the confirmed block when the card has no confirmed values', () => {
+    const wrapper = mountWithPrime(FinalKtruCard, { props: { card } })
+    expect(wrapper.find('[data-test="confirmed"]').exists()).toBe(false)
+  })
+
+  it('renders the confirmed block with the values confirmed in clarifications', () => {
+    const withConfirmed: FinalCard = {
+      ...card,
+      confirmed: [{ name: 'Питание', value: 'От сети' }],
+    }
+    const wrapper = mountWithPrime(FinalKtruCard, { props: { card: withConfirmed } })
+    const block = wrapper.find('[data-test="confirmed"]')
+    expect(block.exists()).toBe(true)
+    expect(block.text()).toContain('Подтверждённые характеристики')
+    expect(block.text()).toContain('Питание')
+    expect(block.text()).toContain('От сети')
+  })
 })

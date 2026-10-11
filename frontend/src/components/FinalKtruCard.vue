@@ -20,6 +20,9 @@ const CHOICE_LABELS: Record<string, string> = {
 
 const unitsLabel = computed(() => props.card.units.join(', '))
 
+/** Characteristic values the user confirmed through clarification follow-ups. */
+const confirmedEntries = computed(() => props.card.confirmed ?? [])
+
 function choiceLabel(choice: string): string {
   return CHOICE_LABELS[choice] ?? choice
 }
@@ -114,6 +117,24 @@ function valueText(value: Record<string, unknown>): string {
           </ul>
         </details>
       </div>
+    </div>
+
+    <div
+      class="space-y-3 border-t border-ink-200 pt-3"
+      v-if="confirmedEntries.length"
+      data-test="confirmed"
+    >
+      <h3 class="eyebrow border-b border-ink-200 pb-2">Подтверждённые характеристики</h3>
+      <ul class="space-y-1">
+        <li
+          class="text-sm text-ink-900"
+          v-for="entry in confirmedEntries"
+          :key="`${entry.name}:${entry.value}`"
+        >
+          <span class="font-semibold">{{ entry.name }}</span>
+          <span class="text-ink-500"> — {{ entry.value }}</span>
+        </li>
+      </ul>
     </div>
 
     <p class="border-t border-ink-200 pt-2 text-xs text-ink-500">Основание: {{ card.rationale }}</p>

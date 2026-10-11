@@ -57,7 +57,7 @@ export interface ClarificationOption {
   suggest_expand?: boolean
 }
 
-export type ClarificationKind = 'characteristic' | 'product'
+export type ClarificationKind = 'characteristic' | 'product' | 'required'
 
 export interface Clarification {
   question_id: string
@@ -98,6 +98,8 @@ export interface FinalCard {
   applies_to?: string | null
   units: string[]
   characteristics: FinalCardCharacteristic[]
+  /** Characteristic values the user confirmed through clarification follow-ups. */
+  confirmed?: { name: string; value: string }[]
   rationale: string
   requires_review: true
 }
