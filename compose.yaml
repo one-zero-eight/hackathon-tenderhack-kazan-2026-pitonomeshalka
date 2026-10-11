@@ -40,11 +40,13 @@ services:
     container_name: ktru-backend
     ports:
       - "8000:8000"
-    # environment:
+    env_file: .env
+    environment:
       # Nimble-модель живет вне compose (SSH-туннель на хосте, см. backend/README.md).
       # Без модели /health и /preview работают, /analyze вернет 502.
-      # NIMBLE_BASE_URL: http://host.docker.internal:8769
-      # NIMBLE_TIMEOUT_SECONDS: "180"
+      NIMBLE_TIMEOUT_SECONDS: "180"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}
+
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
