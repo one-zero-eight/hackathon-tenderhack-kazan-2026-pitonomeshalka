@@ -1,8 +1,8 @@
-networks:
-  default:
-    ipam:
-      config:
-        - subnet: 172.31.255.0/24
+#networks:
+#  default:
+#    ipam:
+#      config:
+#        - subnet: 172.31.255.0/24
 
 services:
   postgres:
@@ -22,6 +22,22 @@ services:
       retries: 10
     restart: unless-stopped
 
+
+  redis:
+    image: redis:7-alpine
+    container_name: ktru-redis
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    command: >
+      redis-server
+      --maxmemory 64mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
   languagetool:
     image: erikvl87/languagetool:latest
@@ -75,6 +91,8 @@ services:
         condition: service_started
       languagetool:
         condition: service_started
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
