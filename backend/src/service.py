@@ -12,7 +12,8 @@ from experiments.classifier_pipeline import batch_jobs, unpack_records
 from experiments.embedding_retrieval import EmbeddingError, MeowEmbedClient
 
 from backend.src import pipeline
-from backend.src.clarify import CLARIFICATION_STATE, apply_option, build_clarification, initial_candidate_codes
+from backend.src.clarify import (CLARIFICATION_STATE, apply_option, build_clarification,
+                                 initial_candidate_codes, next_required_question)
 from backend.src.final_card import build_final_card
 from backend.src.llm import LLMMappingError, RouterClient
 from backend.src.presentation import analysis_response, clarification_response, with_primary_clarification
@@ -204,47 +205,104 @@ class PipelineService:
         except LLMMappingError as error:
             raise ClarificationUnmapped(str(error)) from error
 
+    def _position(self, run, code: str):
+        """The catalogue position of a narrowed candidate, from this run's catalogue import."""
+        positions = {position.code: position for position in
+                     self.store.get_positions(run.get("catalogue_import_sha256"), [code])}
+        position = positions.get(code)
+        if position is None:
+            raise ClarificationConflict("The selected candidate is missing from the run's catalogue import")
+        return position
+
+    @staticmethod
+    def _answered_codes(confirmed: list[dict], skipped: list[str]) -> set:
+        """Required characteristics that are either confirmed or explicitly skipped."""
+        return {record.get("characteristic_code") for record in confirmed} | set(skipped)
+
     def clarify(self, request: ClarifyRequest) -> AnalysisResponse:
         """Advance the deterministic clarification; pure database work, never the model lock."""
         run = self.store.get_run(request.run_id)
         if run is None or run["result"] is None:
             raise UnknownRun("Run is unknown or its result is not saved yet")
         result = run["result"]
+        # Legacy artifacts predate fill_code/confirmed; the defaults keep them readable.
         state = self.store.get_artifact(request.run_id, CLARIFICATION_STATE) or {
             "round": 1, "candidate_codes": initial_candidate_codes(result), "question_id": None, "answers": []}
-        current = build_clarification(result, state["candidate_codes"], state["round"])
-        if request.question_id != current["question_id"]:
+        confirmed = [dict(record) for record in (state.get("confirmed") or [])]
+        skipped = list(state.get("skipped") or [])
+        fill_code = state.get("fill_code")
+        if fill_code is None:
+            current = build_clarification(result, state["candidate_codes"], state["round"])
+        else:
+            # Fill phase: required-characteristic questions never narrow the codes and never
+            # count against the three clarification rounds.
+            position = self._position(run, fill_code)
+            current = next_required_question(fill_code, position,
+                                             self._answered_codes(confirmed, skipped))
+        if current is None or request.question_id != current["question_id"]:
             raise ClarificationConflict("The question does not match the run's current clarification state")
         option_id, free_text = request.option_id, None
         if request.text is not None:
             option_id = self._interpret(current, request.text)
             free_text = request.text
-        try:
-            narrowed = apply_option(current, option_id, state["candidate_codes"])
-        except ValueError as error:
-            raise ClarificationConflict(str(error)) from error
         answer = {"question_id": request.question_id, "option_id": option_id}
         if free_text is not None:
             answer["text"] = free_text
         answers = [*(state.get("answers") or []), answer]
+        if fill_code is not None:
+            return self._answer_required(result, request.run_id, state, current, position, option_id,
+                                         answers, confirmed, skipped)
+        try:
+            narrowed = apply_option(current, option_id, state["candidate_codes"])
+        except ValueError as error:
+            raise ClarificationConflict(str(error)) from error
         if not narrowed:
             state = {"round": state["round"], "candidate_codes": [], "question_id": request.question_id,
                      "answers": answers}
             self.store.save_artifact(request.run_id, CLARIFICATION_STATE, state)
             return clarification_response(result, suggest_expand=True)
         if len(narrowed) == 1:
+            position = self._position(run, narrowed[0])
+            following = next_required_question(narrowed[0], position,
+                                               self._answered_codes(confirmed, skipped))
+            if following is not None:
+                state = {"round": state["round"], "candidate_codes": narrowed,
+                         "question_id": following["question_id"], "answers": answers,
+                         "fill_code": narrowed[0], "confirmed": confirmed, "skipped": skipped}
+                self.store.save_artifact(request.run_id, CLARIFICATION_STATE, state)
+                return clarification_response(result, clarification=following)
             state = {"round": state["round"], "candidate_codes": narrowed, "question_id": request.question_id,
                      "answers": answers}
             self.store.save_artifact(request.run_id, CLARIFICATION_STATE, state)
-            positions = {position.code: position for position in
-                         self.store.get_positions(run.get("catalogue_import_sha256"), narrowed)}
-            position = positions.get(narrowed[0])
-            if position is None:
-                raise ClarificationConflict("The selected candidate is missing from the run's catalogue import")
-            return clarification_response(result, final_card=build_final_card(position, answers))
+            return clarification_response(result, final_card=build_final_card(position, answers, confirmed))
         following_round = state["round"] + 1
         following = build_clarification(result, narrowed, following_round)
         state = {"round": following_round, "candidate_codes": narrowed, "question_id": following["question_id"],
                  "answers": answers}
         self.store.save_artifact(request.run_id, CLARIFICATION_STATE, state)
         return clarification_response(result, clarification=following, manual_choice=following["manual_choice"])
+
+    def _answer_required(self, result, run_id, state, current, position, option_id, answers,
+                         confirmed, skipped):
+        """Record a required-characteristic answer (or its skip) and move to the next question or the card."""
+        selected = next((option for option in current["options"] if option.get("id") == option_id), None)
+        if selected is None:
+            raise ClarificationConflict("unknown or empty clarification option")
+        characteristic = next(item for item in position.characteristics
+                              if item.code == current["characteristic_code"])
+        if selected.get("candidate_codes"):
+            # An empty candidate_codes list marks the skip option: no confirmed record is written.
+            confirmed.append({"characteristic_code": characteristic.code, "name": characteristic.name,
+                              "value": selected["text"]})
+        else:
+            skipped.append(characteristic.code)
+        following = next_required_question(state["fill_code"], position,
+                                           self._answered_codes(confirmed, skipped))
+        state = {"round": state["round"], "candidate_codes": state["candidate_codes"],
+                 "question_id": current["question_id"] if following is None else following["question_id"],
+                 "answers": answers, "fill_code": state["fill_code"], "confirmed": confirmed,
+                 "skipped": skipped}
+        self.store.save_artifact(run_id, CLARIFICATION_STATE, state)
+        if following is None:
+            return clarification_response(result, final_card=build_final_card(position, answers, confirmed))
+        return clarification_response(result, clarification=following)

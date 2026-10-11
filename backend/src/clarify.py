@@ -105,6 +105,62 @@ def build_clarification(result: dict, candidate_codes: list[str], round_number: 
     return _product_question(result, candidate_codes, round_number)
 
 
+SKIP_OPTION_TEXT = "Оставить незаполненным"
+
+
+def askable_values(characteristic) -> list:
+    """Clean text values of a characteristic; span-only (numeric) and issued values never ask."""
+    if characteristic.choice == "fixed" and len(characteristic.values) == 1:
+        return []  # A fixed characteristic with one value is confirmed by the catalog itself.
+    return [value for value in characteristic.values if value.text and not value.issue]
+
+
+def required_characteristics(position) -> list:
+    """Required and actual characteristics that need an answer, in stable characteristic-code order."""
+    return sorted(
+        (characteristic for characteristic in position.characteristics
+         if characteristic.required and characteristic.actual and askable_values(characteristic)),
+        key=lambda characteristic: characteristic.code,
+    )
+
+
+def build_required_question(position_code: str, characteristic) -> dict:
+    """One required-characteristic question; options are the catalog text values plus a skip marker."""
+    question_id = "clarification_req_" + identity(position_code, characteristic.code)
+    return {
+        "question_id": question_id,
+        "kind": "required",
+        # Not part of the public schema; the service records it in the confirmed list.
+        "characteristic_code": characteristic.code,
+        "question": f"Укажите «{characteristic.name}» позиции.",
+        "manual_choice": False,
+        "allow_text": True,
+        "options": [
+            {
+                "id": "option_" + identity(question_id, value.id),
+                "text": value.text,
+                "candidate_codes": [position_code],
+                "suggest_expand": False,
+            }
+            for value in askable_values(characteristic)
+        ] + [_option(question_id, SKIP_OPTION_TEXT, [])],
+    }
+
+
+def next_required_question(position_code: str, position, answered_codes) -> dict | None:
+    """The first unanswered required-characteristic question, or None when the final card is due.
+
+    ``answered_codes`` covers both confirmed answers and explicit skips; skipped
+    characteristics are left unfilled and never asked again.
+    """
+    answered = set(answered_codes or [])
+    pending = [characteristic for characteristic in required_characteristics(position)
+               if characteristic.code not in answered]
+    if not pending:
+        return None
+    return build_required_question(position_code, pending[0])
+
+
 def apply_option(clarification: dict, option_id: str, candidate_codes: list[str]) -> list[str]:
     """Apply a known option by intersecting it with the current candidate codes."""
     selected = next(

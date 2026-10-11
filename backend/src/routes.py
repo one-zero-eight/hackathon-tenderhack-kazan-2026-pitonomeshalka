@@ -160,8 +160,9 @@ def analyze(body: AnalysisRequest, service: PipelineDependency) -> AnalysisRespo
       evidence is insufficient; `rejected` means a definite conflict was found.
       Several candidates can be compatible, and required fields can still be
       missing. `missing_required` lists those fields for compatible candidates.
-      Candidates appear in the order the analysis produced them (retrieval
-      order); they are not re-sorted by status.
+      Candidates are grouped by status in the order `compatible`, `uncertain`,
+      `rejected`; within each group they are sorted by unmatched property count
+      descending, and ties keep the analysis order.
     - `recommended_candidate` is a provisional `code@version`, or `null` when no
       unique candidate satisfies the recommendation checks.
     - `status` is `needs_clarification`, `ready_for_review`, `retrieval_miss`,

@@ -78,3 +78,26 @@ def test_rationale_is_deterministic_and_derived_from_answers():
     assert "25.73.011.111" in first["rationale"]
     assert build_final_card(position(), [{"question_id": "question-b", "option_id": "option-b"}])["rationale"] \
         != first["rationale"]
+
+
+def test_confirmed_values_land_in_the_card_and_rationale():
+    confirmed = [{"characteristic_code": "080", "name": "Тип питания", "value": "От аккумулятора"},
+                 {"characteristic_code": "090", "name": "Патрон", "value": "Под ключ"}]
+
+    card = build_final_card(position(), [{"question_id": "question-a", "option_id": "option-a"}], confirmed)
+    replayed = build_final_card(position(), [{"question_id": "question-a", "option_id": "option-a"}],
+                                [dict(record) for record in confirmed])
+
+    assert card == replayed
+    assert card["confirmed"] == [{"name": "Тип питания", "value": "От аккумулятора"},
+                                 {"name": "Патрон", "value": "Под ключ"}]
+    assert card["rationale"].endswith(
+        " Подтверждено вами: Тип питания = От аккумулятора; Патрон = Под ключ.")
+
+
+def test_card_without_confirmed_values_keeps_the_previous_shape():
+    card = build_final_card(position(), [{"question_id": "question-a", "option_id": "option-a"}])
+
+    assert card["confirmed"] == []
+    assert "Подтверждено" not in card["rationale"]
+    assert card == build_final_card(position(), [{"question_id": "question-a", "option_id": "option-a"}], [])

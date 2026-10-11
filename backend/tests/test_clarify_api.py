@@ -9,9 +9,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.dialects.postgresql import Range
 
 from backend.src.app import create_app
-from backend.src.clarify import CLARIFICATION_STATE, build_clarification, initial_candidate_codes
+from backend.src.clarify import (CLARIFICATION_STATE, build_clarification, initial_candidate_codes,
+                                 next_required_question)
 from backend.src.models import KtruCharacteristic, KtruPosition, KtruValue
-from backend.src.pipeline import CandidateAssessment, Plan, Report
+from backend.src.pipeline import CandidateAssessment, Hypothesis, Plan, Report
 from backend.src.presentation import analysis_response, with_primary_clarification
 from backend.src.retrieval import Retrieval
 from backend.src.schemas import AnalysisResponse, Clarification
@@ -74,28 +75,45 @@ def three_round_fixture():
 
 
 def card_position(code):
+    """A position with two required actual characteristics that ask questions before the card."""
     position = KtruPosition(
         import_sha256=IMPORT_SHA256, code=code, version=1,
         updated=datetime(2026, 1, 15, 10, 30), name="Дрель сетевая",
         status="ACTIVE", applies_from=date(2025, 1, 1), units=["шт"],
         rubrics=["Инструмент"], rubric_codes=["116"], source_file_id=7, source_line=42,
     )
-    characteristic = KtruCharacteristic(
+    power = KtruCharacteristic(
         import_sha256=IMPORT_SHA256, position_code=code, code="080",
         name="Питание", is_numeric=False, choice="one_of", required=True, actual=True,
     )
-    characteristic.values.extend([
+    power.values.extend([
         KtruValue(id=11, ordinal=0, text="От сети", okei="168"),
         KtruValue(id=12, ordinal=1, text=None,
                   spans=[Range(Decimal("3"), Decimal("6"), bounds="[)")], okei="112", value_format="N"),
     ])
-    position.characteristics.extend([characteristic])
+    chuck = KtruCharacteristic(
+        import_sha256=IMPORT_SHA256, position_code=code, code="090",
+        name="Патрон", is_numeric=False, choice="one_of", required=True, actual=True,
+    )
+    chuck.values.append(KtruValue(id=21, ordinal=0, text="Под ключ", okei="168"))
+    position.characteristics.extend([power, chuck])
     return position
 
 
-def assessment(code, status):
+def plain_position(code):
+    """Backward-compatible shape: no askable required characteristics, so the card follows immediately."""
+    position = card_position(code)
+    for characteristic in position.characteristics:
+        characteristic.required = False
+    return position
+
+
+def assessment(code, status, unmatched=()):
     return CandidateAssessment(position=card_position(code), status=status, product_answer=None,
-                               findings=[], missing_required=[], unmatched=[], extras=[], reasons=[])
+                               findings=[], missing_required=[],
+                               unmatched=[Hypothesis(id=f"{code}-{index}", name=name, value="", unit=None)
+                                          for index, name in enumerate(unmatched)],
+                               extras=[], reasons=[])
 
 
 class FakeUpstream:
@@ -106,6 +124,17 @@ class FakeUpstream:
 
     def health(self):
         return {}
+
+
+class RecordingRouter:
+    """Stands in for the LLM router: maps every free-text answer onto the first listed option."""
+
+    def __init__(self):
+        self.calls = []
+
+    def map_option(self, question, options, text):
+        self.calls.append((question, [option["id"] for option in options], text))
+        return options[0]["id"]
 
 
 class ClarifyApiTests(unittest.TestCase):
@@ -134,6 +163,16 @@ class ClarifyApiTests(unittest.TestCase):
 
     def assert_result_untouched(self):
         self.assertEqual(self.store.runs[RUN_ID]["result"], self.saved_result)
+
+    def reach_required(self, code="30"):
+        """Narrow the fixture run to one code and return its first required-characteristic question."""
+        self.seed_run(result_fixture(), positions=[card_position(code)])
+        question = self.first_question(result_fixture())
+        option = next(item for item in question["options"] if item["candidate_codes"] == [code])
+        return self.post(question["question_id"], option["id"]).json()["clarification"]
+
+    def skip_option(self, question):
+        return next(item for item in question["options"] if item["candidate_codes"] == [])
 
     def test_state_artifact_name_is_pinned(self):
         self.assertEqual(CLARIFICATION_STATE, "clarification_state.json")
@@ -170,8 +209,9 @@ class ClarifyApiTests(unittest.TestCase):
         self.assert_result_untouched()
 
     def test_answer_leaving_one_code_returns_final_card_without_clarification(self):
+        # No askable required characteristics: the card follows the narrowing immediately.
         result = result_fixture()
-        self.seed_run(result, positions=[card_position("30")])
+        self.seed_run(result, positions=[plain_position("30")])
         question = self.first_question(result)
         option = next(item for item in question["options"] if item["candidate_codes"] == ["30"])
 
@@ -198,15 +238,132 @@ class ClarifyApiTests(unittest.TestCase):
         battery = next(item for item in question["options"] if item["candidate_codes"] == ["10", "20"])
         second = self.post(question["question_id"], battery["id"]).json()["clarification"]
         option = next(item for item in second["options"] if item["candidate_codes"] == ["20"])
+        required = self.post(second["question_id"], option["id"]).json()["clarification"]
+        # Skipped required characteristics keep their place in the card schema.
+        following = self.post(required["question_id"], self.skip_option(required)["id"]).json()["clarification"]
 
-        payload = self.post(second["question_id"], option["id"]).json()
+        payload = self.post(following["question_id"], self.skip_option(following)["id"]).json()
 
+        self.assertNotIn("clarification", payload)
         characteristic = payload["final_card"]["characteristics"][0]
         self.assertEqual(characteristic["units"], ["112", "168"])
         self.assertTrue(characteristic["required"])
         self.assertEqual([value["id"] for value in characteristic["values"]], [11, 12])
         self.assertEqual(characteristic["values"][1]["spans"],
                          [{"lower": "3", "upper": "6", "bounds": "[)", "empty": False}])
+
+    def test_narrowing_to_one_code_asks_the_required_characteristic_question(self):
+        required = self.reach_required()
+
+        self.assertEqual(required["kind"], "required")
+        self.assertEqual(required["question"], "Укажите «Питание» позиции.")
+        self.assertTrue(required["allow_text"])
+        self.assertFalse(required["manual_choice"])
+        expected = Clarification.model_validate(next_required_question("30", card_position("30"), []))
+        self.assertEqual(required, expected.model_dump(mode="json", exclude_defaults=True))
+        self.assertEqual([item["candidate_codes"] for item in required["options"]], [["30"], []])
+        state = self.store.artifacts[RUN_ID][CLARIFICATION_STATE]
+        self.assertEqual(state["fill_code"], "30")
+        self.assertEqual(state["confirmed"], [])
+        self.assertEqual(state["candidate_codes"], ["30"])
+        self.assertEqual(state["question_id"], required["question_id"])
+
+    def test_required_answer_by_chip_is_confirmed_and_asks_the_next_characteristic(self):
+        required = self.reach_required()
+        chip = required["options"][0]
+
+        payload = self.post(required["question_id"], chip["id"]).json()
+
+        following = payload["clarification"]
+        self.assertEqual(following["kind"], "required")
+        self.assertEqual(following["question"], "Укажите «Патрон» позиции.")
+        self.assertNotIn("final_card", payload)
+        # Required-characteristic answers never change the candidate codes.
+        self.assertEqual([candidate["code"] for candidate in payload["candidates"]], ["10", "20", "30", "40"])
+        state = self.store.artifacts[RUN_ID][CLARIFICATION_STATE]
+        self.assertEqual(state["confirmed"],
+                         [{"characteristic_code": "080", "name": "Питание", "value": chip["text"]}])
+        self.assertEqual(state["candidate_codes"], ["30"])
+        self.assertEqual(state["fill_code"], "30")
+
+    def test_required_answer_by_text_goes_through_the_llm_router(self):
+        required = self.reach_required()
+        router = RecordingRouter()
+        app = create_app(Settings(redis_url=""), client_factory=FakeUpstream,
+                         embedding_client_factory=FakeUpstream, store_factory=lambda _: self.store,
+                         llm_factory=lambda *args: router)
+        with TestClient(app) as client:
+            payload = client.post("/clarify", json={
+                "run_id": RUN_ID, "question_id": required["question_id"], "text": "дрель от сети"}).json()
+
+        chip = required["options"][0]
+        self.assertEqual(router.calls, [(required["question"], [option["id"] for option in required["options"]],
+                                         "дрель от сети")])
+        state = self.store.artifacts[RUN_ID][CLARIFICATION_STATE]
+        self.assertEqual(state["confirmed"],
+                         [{"characteristic_code": "080", "name": "Питание", "value": chip["text"]}])
+        self.assertEqual(state["answers"][-1], {"question_id": required["question_id"],
+                                                "option_id": chip["id"], "text": "дрель от сети"})
+        self.assertEqual(payload["clarification"]["question"], "Укажите «Патрон» позиции.")
+
+    def test_free_text_without_a_configured_router_returns_503_and_writes_nothing(self):
+        required = self.reach_required()
+        app = create_app(Settings(redis_url="", llm_base_url="", llm_model=""), client_factory=FakeUpstream,
+                         embedding_client_factory=FakeUpstream, store_factory=lambda _: self.store)
+        with TestClient(app) as client:
+            response = client.post("/clarify", json={
+                "run_id": RUN_ID, "question_id": required["question_id"], "text": "дрель от сети"})
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("не настроен", response.json()["detail"]["error"])
+        state = self.store.artifacts[RUN_ID][CLARIFICATION_STATE]
+        self.assertEqual(state["confirmed"], [])
+        self.assertEqual(len(state["answers"]), 1)
+
+    def test_skip_option_moves_on_without_a_confirmed_record(self):
+        required = self.reach_required()
+
+        payload = self.post(required["question_id"], self.skip_option(required)["id"]).json()
+
+        following = payload["clarification"]
+        self.assertEqual(following["kind"], "required")
+        self.assertEqual(following["question"], "Укажите «Патрон» позиции.")
+        state = self.store.artifacts[RUN_ID][CLARIFICATION_STATE]
+        self.assertEqual(state["confirmed"], [])
+        self.assertEqual(state["skipped"], ["080"])
+        self.assertEqual(state["answers"][-1]["option_id"], self.skip_option(required)["id"])
+        self.assertEqual(state["candidate_codes"], ["30"])
+
+    def test_final_card_follows_once_required_characteristics_are_answered(self):
+        required = self.reach_required()
+        chip = required["options"][0]
+        second = self.post(required["question_id"], chip["id"]).json()["clarification"]
+        second_chip = second["options"][0]
+
+        payload = self.post(second["question_id"], second_chip["id"]).json()
+
+        self.assertNotIn("clarification", payload)
+        card = payload["final_card"]
+        self.assertEqual(card["confirmed"], [{"name": "Питание", "value": chip["text"]},
+                                             {"name": "Патрон", "value": second_chip["text"]}])
+        self.assertIn("Подтверждено вами: Питание = От сети; Патрон = Под ключ.", card["rationale"])
+        self.assertEqual([candidate["code"] for candidate in payload["candidates"]], ["10", "20", "30", "40"])
+        state = self.store.artifacts[RUN_ID][CLARIFICATION_STATE]
+        self.assertEqual(len(state["confirmed"]), 2)
+        # The answered question is closed: a replay is stale and writes nothing.
+        replay = self.post(second["question_id"], second_chip["id"])
+        self.assertEqual(replay.status_code, 409)
+        self.assertEqual(len(self.store.artifacts[RUN_ID][CLARIFICATION_STATE]["confirmed"]), 2)
+
+    def test_unknown_required_option_returns_409_and_writes_nothing(self):
+        required = self.reach_required()
+
+        response = self.post(required["question_id"], "option_missing")
+
+        self.assertEqual(response.status_code, 409)
+        state = self.store.artifacts[RUN_ID][CLARIFICATION_STATE]
+        self.assertEqual(state["confirmed"], [])
+        self.assertEqual(len(state["answers"]), 1)
 
     def test_three_rounds_reach_manual_choice(self):
         result = three_round_fixture()
@@ -301,7 +458,7 @@ class ClarifyApiTests(unittest.TestCase):
 
     def test_clarify_never_takes_the_model_lock(self):
         result = result_fixture()
-        self.seed_run(result, positions=[card_position("30")])
+        self.seed_run(result, positions=[plain_position("30")])
         question = self.first_question(result)
         option = next(item for item in question["options"] if item["candidate_codes"] == ["30"])
 
@@ -313,22 +470,32 @@ class ClarifyApiTests(unittest.TestCase):
 
 
 class AnalyzeEnrichmentTests(unittest.TestCase):
-    def test_candidates_keep_the_report_order_without_status_sorting(self):
+    def test_candidates_are_grouped_by_status_then_unmatched_count(self):
         report = Report(
             plan=Plan(text="Дрель", retrieval=Retrieval(IMPORT_SHA256, [], [], 0, False),
                       hypotheses=[], bindings=[], spans=[], jobs=[]),
             status="needs_clarification", complete_inference=True, recommended=None,
-            # Retrieval order: uncertain first, then compatible, then rejected.
-            candidates=[assessment("20", "uncertain"), assessment("10", "supported"),
-                        assessment("40", "rejected")],
+            # Analysis order interleaves statuses and unmatched counts.
+            candidates=[assessment("40", "rejected", ("Питание", "Вольтаж")),
+                        assessment("30", "uncertain", ("Питание",)),
+                        assessment("20", "uncertain", ("Питание", "Вольтаж")),
+                        assessment("50", "compatible", ("Питание",)),
+                        assessment("10", "compatible", ("Питание",))],
             properties=[], clarifying_question=None, warnings=[], answers={}, threshold=0.5,
         )
 
         response = analysis_response(report, RUN_ID)
 
-        self.assertEqual([candidate.code for candidate in response.candidates], ["20", "10", "40"])
+        # compatible first, then uncertain, then rejected; within a group the
+        # unmatched count descends, and the equal-count pair (50, 10) keeps the
+        # analysis order instead of the code order.
+        self.assertEqual([candidate.code for candidate in response.candidates],
+                         ["50", "10", "20", "30", "40"])
         self.assertEqual([candidate.status for candidate in response.candidates],
-                         ["uncertain", "compatible", "rejected"])
+                         ["compatible", "compatible", "uncertain", "uncertain", "rejected"])
+        self.assertEqual([candidate.unmatched_properties for candidate in response.candidates],
+                         [["Питание"], ["Питание"], ["Вольтаж", "Питание"], ["Питание"],
+                          ["Вольтаж", "Питание"]])
 
     def test_needs_clarification_response_gains_the_round_one_clarification(self):
         result = result_fixture()

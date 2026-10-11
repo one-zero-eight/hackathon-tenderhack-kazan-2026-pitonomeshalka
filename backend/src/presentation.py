@@ -6,7 +6,8 @@ from backend.src.schemas import AnalysisResponse, Candidate, ExtraPropertyDecisi
 
 
 def analysis_response(report: Report, run_id: str) -> AnalysisResponse:
-    """Candidates keep the report's own order (retrieval order); no status sorting."""
+    """Candidates are grouped by status, then by unmatched property count descending;
+    ties keep the analysis order."""
     candidates = [Candidate(
         code=candidate.position.code, version=str(candidate.position.version), name=candidate.position.name,
         status=candidate.status, reasons=candidate.reasons,
@@ -16,6 +17,8 @@ def analysis_response(report: Report, run_id: str) -> AnalysisResponse:
         extra_characteristics=[ExtraPropertyDecision.model_validate(
             {key: extra[key] for key in ("name", "value", "action")}) for extra in candidate.extras],
     ) for candidate in report.candidates]
+    priority = {"compatible": 0, "uncertain": 1, "rejected": 2}
+    candidates.sort(key=lambda candidate: (priority[candidate.status], -len(candidate.unmatched_properties)))
     recommended = report.recommended
     return AnalysisResponse(
         run_id=run_id, status=report.status, complete_inference=report.complete_inference,

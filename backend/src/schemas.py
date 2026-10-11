@@ -105,7 +105,7 @@ class Clarification(BaseModel):
     """One deterministic question; every answer is a choice between the listed options."""
 
     question_id: str
-    kind: Literal["characteristic", "product"]
+    kind: Literal["characteristic", "product", "required"]
     question: str
     manual_choice: bool
     # Free-text answers are accepted and mapped onto the options through the LLM router.
@@ -161,6 +161,8 @@ class FinalCard(BaseModel):
     rubrics: list[str | None]
     rubric_codes: list[str]
     characteristics: list[FinalCardCharacteristic]
+    # Values the user confirmed through the required-characteristic follow-ups.
+    confirmed: list[Property] = Field(default_factory=list)
     rationale: str
     requires_review: Literal[True]
 
