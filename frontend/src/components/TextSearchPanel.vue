@@ -36,7 +36,7 @@ const topK = ref(DEFAULT_TOP_K)
 const spell = useSpellcheck(props.spellcheck ?? lt, { debounceMs: 300 })
 const searchState = useTextSearch(props.search ?? api)
 const { matches, checkedText, checking, error: spellError } = spell
-const { phase: searchPhase, result: searchResult, error: searchError } = searchState
+const { phase: searchPhase, result: searchResult, error: searchError, clarifyError } = searchState
 
 watch(text, (value) => spell.scheduleCheck(value))
 
@@ -70,6 +70,10 @@ watch(searchPhase, async (phase) => {
 
 function selectFromHistory(query: string) {
   text.value = query
+}
+
+function answerWithText(value: string) {
+  void searchState.clarifyText(value)
 }
 
 const correctionsVisible = computed(
@@ -155,9 +159,11 @@ function expand() {
 
     <AnalysisResult
       v-else-if="searchResult"
+      :clarification-error="clarifyError"
       :result="searchResult"
       @expand="expand"
       @select="choose"
+      @submit-text="answerWithText"
     />
   </section>
 </template>

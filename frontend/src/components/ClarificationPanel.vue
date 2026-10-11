@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import Button from 'primevue/button'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Clarification } from '../api/types'
 
 const props = defineProps<{
@@ -9,9 +9,15 @@ const props = defineProps<{
   pending?: boolean
   /** The run offered no fitting position: suggest a wider search. */
   suggestExpand?: boolean
+  /** The last clarification answer failed; shown inline without losing the context. */
+  error?: string | null
 }>()
 
-const emit = defineEmits<{ expand: []; select: [optionId: string] }>()
+const emit = defineEmits<{
+  expand: []
+  select: [optionId: string]
+  submitText: [text: string]
+}>()
 
 const heading = computed(() =>
   props.clarification.manual_choice ? 'Уточните вручную' : 'Уточняющий вопрос',
@@ -28,8 +34,19 @@ const OPTION_CLASS =
 const EXPAND_NOTE =
   'В коротком списке не нашлось подходящей позиции. Запустите расширенный поиск — система проверит больше кандидатов КТРУ.'
 
+const FREE_HINT = 'Опишите своими словами — ассистент сопоставит ответ с вариантами каталога.'
+
+const draft = ref('')
+
 function choose(optionId: string) {
   if (!props.pending) emit('select', optionId)
+}
+
+function submitText() {
+  const value = draft.value.trim()
+  if (props.pending || !value) return
+  emit('submitText', value)
+  draft.value = ''
 }
 </script>
 
@@ -53,6 +70,32 @@ function choose(optionId: string) {
         {{ option.text }}
         <span class="text-primary-400" v-if="option.suggest_expand">· {{ EXPAND_MARK }}</span>
       </button>
+    </div>
+
+    <div class="space-y-2" v-if="clarification.allow_text">
+      <div class="flex flex-wrap items-center gap-2">
+        <input
+          class="field-base min-w-[220px] flex-1 px-3 py-2 text-sm"
+          v-model="draft"
+          :disabled="pending"
+          @keydown.enter="submitText"
+          data-test="free-input"
+          placeholder="Например: от сети, на аккумуляторе…"
+          type="text"
+        />
+        <Button
+          :disabled="pending || !draft.trim()"
+          @click="submitText"
+          data-test="submit-text"
+          label="Ответить текстом"
+          severity="secondary"
+          size="small"
+        />
+      </div>
+      <p class="text-xs text-ink-500">{{ FREE_HINT }}</p>
+      <p class="text-sm font-medium text-accent-700" v-if="error" data-test="clarify-error">
+        {{ error }}
+      </p>
     </div>
 
     <div

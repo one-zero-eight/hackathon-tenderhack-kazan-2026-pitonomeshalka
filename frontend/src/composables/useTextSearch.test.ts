@@ -93,9 +93,39 @@ describe('useTextSearch.clarify', () => {
     const search = useTextSearch(api)
     await search.search('отвёртка аккумуляторная')
     await search.clarify('opt-1')
-    expect(search.phase.value).toBe('error')
-    expect(search.error.value).toBe('Вопрос устарел')
+    expect(search.phase.value).toBe('done')
+    expect(search.error.value).toBeNull()
+    expect(search.clarifyError.value).toBe('Вопрос устарел')
     expect(search.result.value?.run_id).toBe('partial')
+  })
+
+  it('sends free text to the LLM-backed clarify and keeps the result on failure', async () => {
+    const api = {
+      analyze: vi.fn(async () => needsClarification),
+      clarify: vi.fn(async () => clarified),
+    }
+    const search = useTextSearch(api)
+    await search.search('отвёртка аккумуляторная')
+    await search.clarifyText('  такая отвёртка, но на батарейках  ')
+    expect(api.clarify).toHaveBeenCalledWith({
+      run_id: needsClarification.run_id,
+      question_id: needsClarification.clarification?.question_id,
+      text: 'такая отвёртка, но на батарейках',
+    })
+    expect(search.result.value?.final_card?.code).toBe('26.20.10.000-00000001')
+
+    const failing = {
+      analyze: vi.fn(async () => needsClarification),
+      clarify: vi.fn(async () => {
+        throw new Error('LLM-роутер не настроен')
+      }),
+    }
+    const guarded = useTextSearch(failing)
+    await guarded.search('отвёртка')
+    await guarded.clarifyText('что-то своё')
+    expect(guarded.phase.value).toBe('done')
+    expect(guarded.clarifyError.value).toBe('LLM-роутер не настроен')
+    expect(guarded.result.value?.run_id).toBe(needsClarification.run_id)
   })
 
   it('refuses to clarify when the current result has no question', async () => {

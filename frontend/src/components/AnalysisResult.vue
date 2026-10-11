@@ -8,9 +8,13 @@ import FinalKtruCard from './FinalKtruCard.vue'
 import PropertiesTable from './PropertiesTable.vue'
 import StatusChip from './ui/StatusChip.vue'
 
-const props = defineProps<{ result: AnalysisResponse }>()
+const props = defineProps<{
+  result: AnalysisResponse
+  /** The last clarification answer failed; shown inside the clarification panel. */
+  clarificationError?: string | null
+}>()
 
-const emit = defineEmits<{ expand: []; select: [optionId: string] }>()
+const emit = defineEmits<{ expand: []; select: [optionId: string]; submitText: [text: string] }>()
 
 const recommended = computed(() => {
   const code = props.result.recommended_candidate
@@ -81,8 +85,10 @@ const EXPAND_HINT =
     <ClarificationPanel
       v-if="result.clarification"
       :clarification="result.clarification"
+      :error="clarificationError"
       :suggest-expand="result.suggest_expand"
       @select="emit('select', $event)"
+      @submit-text="emit('submitText', $event)"
     />
 
     <div

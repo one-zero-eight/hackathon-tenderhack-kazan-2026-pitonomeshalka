@@ -64,13 +64,16 @@ export interface Clarification {
   kind: ClarificationKind
   question: string
   manual_choice: boolean
+  /** Free-text answers are accepted and mapped onto the options through the LLM router. */
+  allow_text?: boolean
   options: ClarificationOption[]
 }
 
 export interface ClarifyRequest {
   run_id: string
   question_id: string
-  option_id: string
+  option_id?: string
+  text?: string
 }
 
 export interface FinalCardCharacteristic {
