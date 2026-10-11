@@ -1,8 +1,19 @@
 import { flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnalysisResponse } from '../api/types'
+import { api } from '../services'
 import { mountWithPrime } from '../test/mount'
 import TextSearchPanel from './TextSearchPanel.vue'
+
+vi.mock('../services', () => ({
+  api: {
+    addHistory: vi.fn(async () => undefined),
+    getHistory: vi.fn(async () => ({ queries: [] })),
+  },
+  lt: {
+    check: vi.fn(async (text: string) => ({ text, language: 'ru', matches: [] })),
+  },
+}))
 
 const analysis: AnalysisResponse = {
   run_id: 'r1',
@@ -101,6 +112,38 @@ describe('TextSearchPanel', () => {
     await flushPromises()
     expect(wrapper.find('[data-test="robot"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="result"]').exists()).toBe(true)
+  })
+
+  it('writes history once per analysis run, not per clarification round', async () => {
+    const addHistory = vi.mocked(api.addHistory)
+    addHistory.mockClear()
+    let runs = 0
+    const search = {
+      analyze: vi.fn(async () => {
+        runs += 1
+        return runs === 1 ? clarificationResult : { ...analysis, run_id: 'r2' }
+      }),
+      clarify: vi.fn(async () => analysis),
+    }
+    const wrapper = mountWithPrime(TextSearchPanel, {
+      props: { spellcheck: quietSpellcheck, search },
+    })
+    await wrapper.find('textarea').setValue('дрель')
+
+    await wrapper.find('[data-test="search"]').trigger('click')
+    await flushPromises()
+    expect(addHistory).toHaveBeenCalledTimes(1)
+    expect(addHistory).toHaveBeenCalledWith(expect.any(String), 'дрель')
+
+    // The clarification answer keeps the same run_id, so history is not written again.
+    await wrapper.find('[data-test="option"]').trigger('click')
+    await flushPromises()
+    expect(addHistory).toHaveBeenCalledTimes(1)
+
+    // A repeated analysis produces a new run_id and is written once more.
+    await wrapper.find('[data-test="search"]').trigger('click')
+    await flushPromises()
+    expect(addHistory).toHaveBeenCalledTimes(2)
   })
 
   it('sends the chosen clarification option to the backend', async () => {

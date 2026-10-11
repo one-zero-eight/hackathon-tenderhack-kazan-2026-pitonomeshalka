@@ -56,17 +56,21 @@ onMounted(() => {
   void loadHistory()
 })
 
-watch(searchPhase, async (phase) => {
-  if (phase !== 'done' && phase !== 'error') return
-  const queryText = text.value.trim()
-  if (!queryText) return
-  try {
-    await api.addHistory(sessionId, queryText)
-    await loadHistory()
-  } catch {
-    // history is best-effort
-  }
-})
+/** History is written once per analysis run: a fresh run_id means a new /analyze. */
+watch(
+  () => searchResult.value?.run_id,
+  async (runId) => {
+    if (!runId) return
+    const queryText = text.value.trim()
+    if (!queryText) return
+    try {
+      await api.addHistory(sessionId, queryText)
+      await loadHistory()
+    } catch {
+      // history is best-effort
+    }
+  },
+)
 
 function selectFromHistory(query: string) {
   text.value = query
