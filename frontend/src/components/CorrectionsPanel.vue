@@ -14,8 +14,11 @@ const MAX_SUGGESTIONS = 3
 const FIX_ALL_HINT = 'Применяет первое предложенное исправление для каждой опечатки'
 const expanded = ref(true)
 
-/** «Исправить всё» only makes sense when LanguageTool offered at least one variant. */
-const hasSuggestions = computed(() => props.matches.some((m) => m.replacements.length > 0))
+/**
+ * «Исправить всё» is shown only when at least one match has a non-empty first
+ * variant — exactly what applyAllCorrections would actually apply.
+ */
+const hasSuggestions = computed(() => props.matches.some((m) => !!m.replacements[0]))
 
 const PANEL_CLASS =
   'card-registry animate-rise-in space-y-3 border-l-4 border-l-warning-500 ' + 'bg-warning-50 p-4'
@@ -25,8 +28,8 @@ const BODY_CLASS =
   'motion-reduce:transition-none'
 
 const TOGGLE_CLASS =
-  'grid h-7 w-7 place-items-center rounded-lg border border-warning-200 bg-white ' +
-  'text-warning-700 transition-transform duration-300 hover:bg-warning-100 ' +
+  'grid h-8 w-8 place-items-center border-2 border-warning-500 bg-white ' +
+  'text-warning-700 transition-transform duration-300 hover:bg-warning-50 ' +
   'motion-reduce:transition-none'
 </script>
 
@@ -36,42 +39,44 @@ const TOGGLE_CLASS =
       <p class="text-sm font-semibold text-warning-700">
         Похоже, есть опечатки — проверьте перед поиском
       </p>
-      <Button
-        class="hover:bg-warning-100 ml-auto"
-        v-if="hasSuggestions"
-        v-tooltip.top="FIX_ALL_HINT"
-        @click="$emit('applyAll')"
-        data-test="apply-all"
-        label="Исправить всё"
-        severity="secondary"
-        size="small"
-      />
-      <button
-        id="corrections-toggle"
-        :aria-expanded="expanded"
-        :class="TOGGLE_CLASS"
-        :title="expanded ? 'Скрыть исправления' : 'Показать исправления'"
-        @click="expanded = !expanded"
-        aria-controls="corrections-issues"
-        data-test="toggle"
-        type="button"
-      >
-        <svg
-          class="h-4 w-4 transition-transform duration-300 motion-reduce:transition-none"
-          :class="expanded ? 'rotate-180' : ''"
-          aria-hidden="true"
-          fill="none"
-          viewBox="0 0 20 20"
+      <div class="ml-auto flex items-center gap-3">
+        <Button
+          class="hover:bg-warning-100"
+          v-if="hasSuggestions"
+          v-tooltip.top="FIX_ALL_HINT"
+          @click="$emit('applyAll')"
+          data-test="apply-all"
+          label="Исправить всё"
+          severity="secondary"
+          size="small"
+        />
+        <button
+          id="corrections-toggle"
+          :aria-expanded="expanded"
+          :class="TOGGLE_CLASS"
+          :title="expanded ? 'Скрыть исправления' : 'Показать исправления'"
+          @click="expanded = !expanded"
+          aria-controls="corrections-issues"
+          data-test="toggle"
+          type="button"
         >
-          <path
-            d="m6 8 4 4 4-4"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.8"
-          />
-        </svg>
-      </button>
+          <svg
+            class="h-4 w-4 transition-transform duration-300 motion-reduce:transition-none"
+            :class="expanded ? 'rotate-180' : ''"
+            aria-hidden="true"
+            fill="none"
+            viewBox="0 0 20 20"
+          >
+            <path
+              d="m6 8 4 4 4-4"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.8"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
     <div
       id="corrections-issues"

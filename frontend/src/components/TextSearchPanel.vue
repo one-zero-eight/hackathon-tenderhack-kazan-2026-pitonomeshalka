@@ -1,13 +1,15 @@
 <script lang="ts" setup>
 import Button from 'primevue/button'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { AnalysisScope } from '../api/types'
 import { useSpellcheck, type SpellcheckClient } from '../composables/useSpellcheck'
 import { useTextSearch, type TextSearchClient } from '../composables/useTextSearch'
+import { getSessionId } from '../lib/sessionId'
 import { api, lt } from '../services'
 import AnalysisResult from './AnalysisResult.vue'
 import CorrectionsPanel from './CorrectionsPanel.vue'
 import RobotSearching from './RobotSearching.vue'
+import SearchHistory from './SearchHistory.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -22,7 +24,7 @@ const props = withDefaults(
 
 const MAX_LENGTH = 10000
 
-const SELECT_CLASS = 'field-base px-3 py-2 text-sm'
+const SELECT_CLASS = 'field-base text-sm'
 const TEXTAREA_CLASS = 'field-base w-full resize-y px-4 py-3 text-[15px] leading-relaxed transition'
 const ERROR_CARD =
   'card-registry space-y-2 border-accent-200 bg-accent-50 p-4 text-sm text-accent-700'
@@ -35,6 +37,38 @@ const { matches, checkedText, checking, error: spellError } = spell
 const { phase: searchPhase, result: searchResult, error: searchError } = searchState
 
 watch(text, (value) => spell.scheduleCheck(value))
+
+const sessionId = getSessionId()
+const historyQueries = ref<string[]>([])
+
+async function loadHistory() {
+  try {
+    const response = await api.getHistory(sessionId)
+    historyQueries.value = response.queries
+  } catch {
+    historyQueries.value = []
+  }
+}
+
+onMounted(() => {
+  void loadHistory()
+})
+
+watch(searchPhase, async (phase) => {
+  if (phase !== 'done' && phase !== 'error') return
+  const queryText = text.value.trim()
+  if (!queryText) return
+  try {
+    await api.addHistory(sessionId, queryText)
+    await loadHistory()
+  } catch {
+    // history is best-effort
+  }
+})
+
+function selectFromHistory(query: string) {
+  text.value = query
+}
 
 const correctionsVisible = computed(
   () => checkedText.value === text.value && matches.value.length > 0,
@@ -58,7 +92,7 @@ function run() {
     <div class="card-registry animate-rise-in space-y-4 p-6">
       <div class="flex flex-wrap items-baseline gap-3 border-b border-ink-200 pb-3">
         <h2 class="eyebrow">Описание товара</h2>
-        <span class="ml-auto font-mono text-xs text-ink-400 tabular-nums">
+        <span class="ml-auto font-mono text-xs text-ink-500 tabular-nums">
           {{ text.length }} / {{ MAX_LENGTH }}
         </span>
       </div>
@@ -82,15 +116,17 @@ function run() {
           </select>
         </label>
         <Button
-          class="btn-cta ml-auto px-6"
+          class="btn-cta ml-auto"
           :disabled="!text.trim() || searchPhase === 'searching'"
           :loading="searchPhase === 'searching'"
           @click="run"
           data-test="search"
-          label="Найти в КТРУ"
           size="large"
-        />
+        >
+          Найти в КТРУ <span aria-hidden="true">→</span>
+        </Button>
       </div>
+      <SearchHistory :queries="historyQueries" @select="selectFromHistory" />
       <p class="text-[13px] text-ink-500" v-if="checking">Проверяем орфографию…</p>
       <p class="text-[13px] text-warning-700" v-else-if="spellError" data-test="lt-warning">
         Проверка орфографии недоступна — отправим текст как есть

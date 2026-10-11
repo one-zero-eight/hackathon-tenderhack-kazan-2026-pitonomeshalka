@@ -77,3 +77,12 @@ export interface HealthPayload {
   status: string
   model_busy: boolean
 }
+
+export interface HistoryAddRequest {
+  session_id: string
+  query: string
+}
+
+export interface HistoryResponse {
+  queries: string[]
+}

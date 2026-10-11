@@ -44,10 +44,10 @@ const label = computed(
 )
 
 const TONES = {
-  loading: 'bg-ink-100 text-ink-500',
-  ok: 'bg-success-50 text-success-700',
-  busy: 'bg-warning-50 text-warning-700',
-  down: 'bg-accent-50 text-accent-700',
+  loading: 'health-loading',
+  ok: 'health-ok',
+  busy: 'health-busy',
+  down: 'health-down',
 } as const
 
 const DOTS = {
@@ -56,13 +56,10 @@ const DOTS = {
   busy: 'bg-warning-500',
   down: 'bg-accent-500',
 } as const
-
-const BADGE =
-  'inline-flex items-center gap-2 border border-ink-200 px-3 py-1.5 text-xs font-semibold'
 </script>
 
 <template>
-  <span :class="[BADGE, TONES[state]]" data-test="health">
+  <span :class="['health-badge', TONES[state]]" data-test="health">
     <span class="h-2 w-2" :class="DOTS[state]" />
     {{ label }}
   </span>

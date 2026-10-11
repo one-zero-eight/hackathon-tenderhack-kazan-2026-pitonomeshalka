@@ -4,7 +4,7 @@ import ProgressBar from 'primevue/progressbar'
 import { computed, ref } from 'vue'
 import type { AnalysisResponse } from '../api/types'
 import { useCsvBatch, type BatchRow } from '../composables/useCsvBatch'
-import { guessQueryColumn, parseTable, rowToQuery, type CsvTable } from '../lib/csv'
+import { parseTable, type CsvTable } from '../lib/csv'
 import { api, spellCorrect } from '../services'
 import CsvResultItem from './CsvResultItem.vue'
 
@@ -40,7 +40,6 @@ const batch = useCsvBatch(
 
 const fileName = ref('')
 const table = ref<CsvTable | null>(null)
-const queryColumn = ref(0)
 const dragging = ref(false)
 const fileError = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -48,8 +47,6 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const DROPZONE =
   'flex cursor-pointer flex-col items-center gap-3 border-2 border-dashed ' +
   'px-6 py-10 text-center transition'
-const SELECT_CLASS = 'field-base px-3 py-2 text-sm'
-
 const rowsCount = computed(() => table.value?.rows.length ?? 0)
 const dropzoneTone = computed(() =>
   dragging.value ? 'border-primary-500 bg-primary-50' : 'border-ink-300 bg-white',
@@ -73,12 +70,11 @@ async function onFile(file: File | null | undefined) {
   if (parsed.rows.length === 0) {
     table.value = null
     fileName.value = ''
-    fileError.value = 'В файле нет строк данных — нужна шапка и хотя бы одна строка'
+    fileError.value = 'В файле нет строк с описаниями'
     return
   }
   fileName.value = file.name
   table.value = parsed
-  queryColumn.value = guessQueryColumn(parsed.headers, parsed.rows)
 }
 
 function onInputChange(event: Event) {
@@ -97,13 +93,10 @@ function pickFile() {
 
 function startBatch() {
   if (!table.value) return
-  const rows: BatchRow[] = table.value.rows
-    .map((row, index) => ({ id: index, query: rowToQuery(row, queryColumn.value) }))
-    .filter((row) => row.query.length > 0)
-  if (rows.length === 0) {
-    fileError.value = 'В выбранном столбце нет ни одной непустой ячейки — выберите другой столбец'
-    return
-  }
+  const rows: BatchRow[] = table.value.rows.map((row, index) => ({
+    id: index,
+    query: row[0],
+  }))
   fileError.value = ''
   ltFailed.value = false
   batch.start(rows)
@@ -155,7 +148,7 @@ function reset() {
         <p class="text-[15px] font-semibold text-ink-900">
           Перетащите CSV-файл сюда или выберите на диске
         </p>
-        <p class="text-xs text-ink-500">Поддерживаются разделители «;», «,» и табуляция</p>
+        <p class="text-xs text-ink-500">Каждая непустая строка файла — отдельное описание товара</p>
         <Button @click.stop="pickFile" label="Выбрать файл" severity="secondary" size="small" />
       </div>
 
@@ -165,14 +158,6 @@ function reset() {
 
       <div class="card-registry space-y-3 bg-primary-50 p-4" v-if="table">
         <p class="text-sm font-semibold text-ink-900">{{ fileName }} — строк: {{ rowsCount }}</p>
-        <label class="flex items-center gap-2 text-sm text-ink-500">
-          Столбец с описанием
-          <select v-model.number="queryColumn" :class="SELECT_CLASS" data-test="column">
-            <option v-for="(header, index) in table.headers" :key="index" :value="index">
-              {{ header || `Столбец ${index + 1}` }}
-            </option>
-          </select>
-        </label>
         <div class="overflow-x-auto bg-white">
           <table class="w-full text-xs">
             <tbody>

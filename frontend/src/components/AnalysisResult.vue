@@ -58,7 +58,7 @@ const WARNINGS_CLASS =
     <div class="card-registry space-y-3 p-5">
       <h3 class="eyebrow border-b border-ink-200 pb-2">Характеристики из запроса</h3>
       <PropertiesTable :properties="result.properties" />
-      <p class="text-sm text-ink-400" v-if="result.properties.length === 0">
+      <p class="text-sm text-ink-500" v-if="result.properties.length === 0">
         Характеристики не распознаны
       </p>
     </div>
@@ -79,7 +79,7 @@ const WARNINGS_CLASS =
         :candidate="candidate"
         :key="`${candidate.code}@${candidate.version}`"
       />
-      <p class="text-sm text-ink-400" v-if="result.candidates.length === 0">Кандидаты не найдены</p>
+      <p class="text-sm text-ink-500" v-if="result.candidates.length === 0">Кандидаты не найдены</p>
     </div>
   </section>
 </template>

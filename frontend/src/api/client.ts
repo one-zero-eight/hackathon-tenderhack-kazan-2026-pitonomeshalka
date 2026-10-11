@@ -1,6 +1,12 @@
 import type { FetchLike } from '../lib/fetch-like'
 import { normalizeAnalysis } from './normalize'
-import type { AnalysisRequest, AnalysisResponse, HealthPayload, PreviewResponse } from './types'
+import type {
+  AnalysisRequest,
+  AnalysisResponse,
+  HealthPayload,
+  HistoryResponse,
+  PreviewResponse,
+} from './types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -86,6 +92,24 @@ export class KtruApiClient {
     const response = await this.fetchImpl(`${this.baseUrl}/health`, { method: 'GET', signal })
     if (!response.ok) throw await toApiError(response)
     return (await response.json()) as HealthPayload
+  }
+
+  async getHistory(sessionId: string, signal?: AbortSignal): Promise<HistoryResponse> {
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/history/${encodeURIComponent(sessionId)}`,
+      { method: 'GET', signal },
+    )
+    if (!response.ok) throw await toApiError(response)
+    return (await response.json()) as HistoryResponse
+  }
+
+  async addHistory(sessionId: string, query: string, signal?: AbortSignal): Promise<void> {
+    await this.fetchImpl(`${this.baseUrl}/history`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, query }),
+      signal,
+    })
   }
 
   private async request<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {

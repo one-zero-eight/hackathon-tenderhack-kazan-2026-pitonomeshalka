@@ -46,6 +46,45 @@ describe('CorrectionsPanel', () => {
     expect(wrapper.emitted('applyAll')).toHaveLength(1)
   })
 
+  it('hides the fix-all button when no match has suggestions', () => {
+    const wrapper = mountWithPrime(CorrectionsPanel, {
+      props: { matches: [match({ replacements: [] })] },
+    })
+    expect(wrapper.find('[data-test="panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="apply-all"]').exists()).toBe(false)
+  })
+
+  it('hides the fix-all button when the only suggestion is an empty deletion', () => {
+    // applyAllCorrections skips a falsy first replacement, so the button would be a no-op.
+    const wrapper = mountWithPrime(CorrectionsPanel, {
+      props: { matches: [match({ replacements: [''] })] },
+    })
+    expect(wrapper.find('[data-test="apply-all"]').exists()).toBe(false)
+  })
+
+  it('shows the fix-all button when at least one match has suggestions', () => {
+    const wrapper = mountWithPrime(CorrectionsPanel, {
+      props: {
+        matches: [
+          match({ replacements: [] }),
+          match({ offset: 8, errorText: 'магазен', replacements: ['магазин'] }),
+        ],
+      },
+    })
+    expect(wrapper.find('[data-test="apply-all"]').exists()).toBe(true)
+  })
+
+  it('reveals the fix-all tooltip on hover', async () => {
+    const wrapper = mountWithPrime(CorrectionsPanel, { props: { matches: [match()] } })
+    await wrapper.find('[data-test="apply-all"]').trigger('mouseenter')
+    // The directive shows the tooltip on a showDelay timer, then Teleports it to body.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(document.body.textContent).toContain(
+      'Применяет первое предложенное исправление для каждой опечатки',
+    )
+    wrapper.unmount()
+  })
+
   it('collapses and expands the issue list from the header toggle', async () => {
     const wrapper = mountWithPrime(CorrectionsPanel, { props: { matches: [match()] } })
     const toggle = () => wrapper.find('[data-test="toggle"]')
