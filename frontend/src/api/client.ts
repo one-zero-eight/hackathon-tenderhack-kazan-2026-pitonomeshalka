@@ -25,6 +25,28 @@ export interface ApiClientOptions {
   fetch?: FetchLike
 }
 
+interface AnalysisJob {
+  run_id: string
+  status: 'running' | 'completed' | 'failed'
+  result: AnalysisResponse | null
+  error: string | null
+}
+
+function waitForPoll(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    signal?.throwIfAborted()
+    const abort = () => {
+      clearTimeout(timer)
+      reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'))
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort)
+      resolve()
+    }, 2000)
+    signal?.addEventListener('abort', abort, { once: true })
+  })
+}
+
 function defaultBaseUrl(): string {
   return import.meta.env.VITE_API_BASE ?? '/api'
 }
@@ -80,8 +102,46 @@ export class KtruApiClient {
   }
 
   async analyze(request: AnalysisRequest, signal?: AbortSignal): Promise<AnalysisResponse> {
-    const result = await this.request<AnalysisResponse>('analyze', request, signal)
-    return normalizeAnalysis(result)
+    const job = await this.request<AnalysisJob>('analyses', request, signal)
+    return this.waitForAnalysis(job.run_id, signal)
+  }
+
+  /** Resume polling an accepted run; never submit duplicate GPU work on a fetch failure. */
+  async waitForAnalysis(runId: string, signal?: AbortSignal): Promise<AnalysisResponse> {
+    let failures = 0
+    for (;;) {
+      signal?.throwIfAborted()
+      let job: AnalysisJob
+      try {
+        const response = await this.fetchImpl(
+          `${this.baseUrl}/analyses/${encodeURIComponent(runId)}`,
+          { method: 'GET', signal, cache: 'no-store' },
+        )
+        if (!response.ok) throw await toApiError(response)
+        job = (await response.json()) as AnalysisJob
+        failures = 0
+      } catch (error) {
+        signal?.throwIfAborted()
+        if (error instanceof ApiError && error.status < 500) throw error
+        if (++failures >= 3) {
+          throw new ApiError(
+            `Connection lost while checking analysis ${runId}. Resume polling this run to recover its result.`,
+            0,
+          )
+        }
+        await waitForPoll(signal)
+        continue
+      }
+      const result = job.result ? normalizeAnalysis(job.result) : null
+      if (job.status === 'failed') {
+        throw new ApiError(job.error ?? 'Analysis failed', 502, result)
+      }
+      if (job.status === 'completed') {
+        if (!result) throw new ApiError(`Analysis ${runId} completed without a saved result`, 502)
+        return result
+      }
+      await waitForPoll(signal)
+    }
   }
 
   preview(request: AnalysisRequest, signal?: AbortSignal): Promise<PreviewResponse> {

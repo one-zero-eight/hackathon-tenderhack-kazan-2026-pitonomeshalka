@@ -1,6 +1,8 @@
 """Plan against detached ORM records, retain evidence and serialize model access."""
 
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
+from collections import OrderedDict
 import json
 import logging
 from threading import Lock
@@ -42,6 +44,9 @@ class PipelineService:
         self.settings = settings
         self.client_factory = client_factory
         self.model_lock = Lock()
+        self.analysis_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="analysis")
+        self.jobs_lock = Lock()
+        self.jobs = OrderedDict()
         self.store = store
         embedding_client = embedding_client_factory(settings.embedding_base_url, settings.embedding_model,
                                                     settings.embedding_timeout_seconds)
@@ -53,7 +58,11 @@ class PipelineService:
             retrieval = self.retriever.retrieve(request.text, request.scope, request.top_k)
             batch_size = self.settings.classifier_batch_size
             chunk_size = min(request.chunk_size, batch_size) if batch_size else request.chunk_size
-            return pipeline.prepare(retrieval, request.text, chunk_size, self.settings.max_questions)
+            plan = pipeline.prepare(retrieval, request.text, chunk_size, self.settings.max_questions)
+            budget = plan.retrieval.details.get("question_budget")
+            if budget:
+                logger.warning("Analysis plan adjusted to question budget: %s", budget)
+            return plan
         except EmbeddingError as error:
             raise InferenceFailure("Embedding retrieval failed: " + str(error)) from error
         except ValueError as error:
@@ -68,6 +77,7 @@ class PipelineService:
             planned_requests=len(self._requests(plan)), planned_questions=plan.question_count,
             candidates=[CandidateReference(code=p.code, version=str(p.version), name=p.name)
                         for p in plan.retrieval.positions],
+            warnings=pipeline.budget_warnings(plan),
         )
 
     def model_health(self) -> dict:
@@ -113,7 +123,10 @@ class PipelineService:
                 "sources": {key: job[key] for key in ("parts", "facts", "bindings", "positions") if key in job},
             }
             # Commit before dispatch: interrupted or still-running GPU calls stay visible.
-            self.store.start_model_call(run_id, index, outgoing)
+            try:
+                self.store.start_model_call(run_id, index, outgoing)
+            except Exception as e:
+                logger.warning("Could not persist start_model_call for run_id=%s batch=%d: %s", run_id, index, e)
             logger.info("Model request: %d/%d run_id=%s id=%s experiment=%s questions=%d",
                         index + 1, len(requests), run_id, job["id"], job["experiment"],
                         len(job["body"]["questions"]))
@@ -126,27 +139,96 @@ class PipelineService:
                 failure = str(error)
                 record.update(request=job["body"], error=failure, elapsed_seconds=perf_counter() - started)
             records.append(record)
-            self.store.finish_model_call(run_id, index, record)
+            try:
+                self.store.finish_model_call(run_id, index, record)
+            except Exception as e:
+                logger.warning("Could not persist finish_model_call for run_id=%s batch=%d: %s", run_id, index, e)
             if failure:
                 break  # Never retry a timed-out call: it may still own the shared GPU.
-        self.store.save_artifact(run_id, "summary.json", {
-            "planned_requests": len(requests), "completed_requests": len(records),
-            "successful_requests": sum("response" in record for record in records),
-            "stopped_early": len(records) < len(requests), "error": failure})
+        try:
+            self.store.save_artifact(run_id, "summary.json", {
+                "planned_requests": len(requests), "completed_requests": len(records),
+                "successful_requests": sum("response" in record for record in records),
+                "stopped_early": len(records) < len(requests), "error": failure})
+        except Exception as e:
+            logger.warning("Could not save summary.json artifact for run_id=%s: %s", run_id, e)
         return records, failure
 
-    def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
+    def _reserve_run(self) -> str:
         if not self.model_lock.acquire(blocking=False):
             raise ModelBusy("A model request is already running; try again after it finishes")
-        run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + uuid4().hex
+        return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + uuid4().hex
+
+    def start_analysis(self, request: AnalysisRequest) -> str:
+        """Reserve and persist a run for the synchronous endpoint."""
+        run_id = self._reserve_run()
+        try:
+            self.store.begin_run(run_id, request.model_dump(mode="json"))
+        except BaseException:
+            self.model_lock.release()
+            raise
+        logger.info("Analysis started: run_id=%s", run_id)
+        return run_id
+
+    def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
+        return self._analyze_started(request, self.start_analysis(request))
+
+    def submit_analysis(self, request: AnalysisRequest) -> str:
+        run_id = self._reserve_run()
+        self._update_job(run_id, status="running", result=None, error=None)
+        try:
+            # Schedule before sending HTTP headers: even a failed delivery of
+            # the 202 response must not leave a reserved model lock orphaned.
+            self.analysis_worker.submit(self._persist_analysis, request, run_id)
+        except BaseException as error:
+            self._update_job(run_id, status="failed", result=None, error=str(error))
+            self.model_lock.release()
+            raise
+        return run_id
+
+    def _update_job(self, run_id: str, **state) -> None:
+        with self.jobs_lock:
+            self.jobs[run_id] = {"id": run_id, **state}
+            # Keep polling independent of slow database calls, with bounded memory.
+            while len(self.jobs) > 32:
+                self.jobs.popitem(last=False)
+
+    def get_analysis_job(self, run_id: str) -> dict | None:
+        with self.jobs_lock:
+            cached = self.jobs.get(run_id)
+        return dict(cached) if cached is not None else self.store.get_run(run_id)
+
+    def _persist_analysis(self, request: AnalysisRequest, run_id: str) -> None:
+        try:
+            self.store.begin_run(run_id, request.model_dump(mode="json"))
+        except Exception as error:
+            self._update_job(run_id, status="failed", result=None, error=str(error))
+            self.model_lock.release()
+            logger.exception("Could not persist analysis: run_id=%s", run_id)
+            return
+        logger.info("Analysis started: run_id=%s", run_id)
+        self.analyze_in_background(request, run_id)
+
+    def close(self) -> None:
+        self.analysis_worker.shutdown(wait=True)
+
+    def analyze_in_background(self, request: AnalysisRequest, run_id: str) -> None:
+        # The HTTP response has already been sent. Failures are persisted by the
+        # worker and reported by polling, rather than raised through ASGI.
+        try:
+            result = self._analyze_started(request, run_id)
+            self._update_job(run_id, status="completed", result=result.model_dump(mode="json"), error=None)
+        except Exception as error:
+            partial = error.result if isinstance(error, InferenceFailure) else None
+            self._update_job(run_id, status="failed", error=str(error),
+                             result=partial.model_dump(mode="json") if partial else None)
+            logger.exception("Background analysis failed: run_id=%s", run_id)
+
+    def _analyze_started(self, request: AnalysisRequest, run_id: str) -> AnalysisResponse:
         token = current_run.set(run_id)
-        saved = False
         finalized = False
         try:
             started = perf_counter()
-            self.store.begin_run(run_id, request.model_dump(mode="json"))
-            saved = True
-            logger.info("Analysis started: run_id=%s", run_id)
             plan = self.prepare(request)
             requests = self._requests(plan)
             self.store.save_plan(run_id, dict(plan.snapshot(), requests=requests))
@@ -168,7 +250,7 @@ class PipelineService:
                 raise InferenceFailure(failure, result)
             return result
         except Exception as error:
-            if saved and not finalized:
+            if not finalized:
                 try:
                     self.store.fail_run(run_id, error)
                 except Exception:

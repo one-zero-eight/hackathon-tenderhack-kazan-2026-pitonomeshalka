@@ -57,6 +57,8 @@ def create_app(
     async def lifespan(application: FastAPI):
         configuration = settings or Settings.from_environment()
         store = store_factory(configuration)
+        pipeline_service = None
+        history = None
         try:
             await run_in_threadpool(store.initialize)
             application.state.storage = store
@@ -68,6 +70,7 @@ def create_app(
                 logging.getLogger("uvicorn.error").warning("No active catalogue; run scripts/load_db.py --activate %s", configuration.catalog_key)
             application.state.pipeline = PipelineService(configuration, client_factory,
                                                         embedding_client_factory, store=store)
+            pipeline_service = application.state.pipeline
             history = SearchHistoryStore(
                 configuration.redis_url,
                 max_items=configuration.history_max_items,
@@ -76,7 +79,10 @@ def create_app(
             application.state.history = history
             yield
         finally:
-            history.close()
+            if pipeline_service is not None:
+                await run_in_threadpool(pipeline_service.close)
+            if history is not None:
+                history.close()
             await run_in_threadpool(store.close)
 
     application = FastAPI(

@@ -2,11 +2,12 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 
 from backend.src.schemas import (
     AnalysisRequest,
     AnalysisResponse,
+    AnalysisJobResponse,
     ErrorResponse,
     HealthResponse,
     HistoryAddRequest,
@@ -38,6 +39,7 @@ def get_pipeline_service(request: Request) -> PipelineService:
 
 
 PipelineDependency = Annotated[PipelineService, Depends(get_pipeline_service)]
+RunId = Annotated[str, Path(pattern=r"^[0-9]{8}T[0-9]{12}Z_[0-9a-f]{32}$")]
 
 
 def get_history_store(request: Request) -> SearchHistoryStore:
@@ -92,6 +94,7 @@ def model_health(service: PipelineDependency) -> ModelHealthResponse:
 
 @router.post(
     "/preview", tags=["Pipeline"], summary="Preview semantic candidates and classifier request counts",
+    response_model_exclude_defaults=True,
     responses={
         502: {"model": ErrorResponse, "description": "Embedding retrieval failed; no classifier inference was attempted."},
         503: {"model": ErrorResponse, "description": "PostgreSQL is unavailable."},
@@ -111,6 +114,7 @@ def preview(body: AnalysisRequest, service: PipelineDependency) -> PreviewRespon
       been checked.
     - `planned_requests`: the number of classifier HTTP requests after batching.
     - `planned_questions`: the total number of individual classifier questions.
+    - `warnings`: present when the question budget reduces candidates or checks.
 
     `chunk_size` controls logical categorical-question groups; HTTP packing is
     controlled by `CLASSIFIER_BATCH_SIZE`. `threshold` and `extras` are accepted
@@ -121,14 +125,62 @@ def preview(body: AnalysisRequest, service: PipelineDependency) -> PreviewRespon
     first request can take longer. No classifier inference or analysis-run record
     is created. Preview can run while the classifier is busy.
 
-    Invalid input or a plan exceeding the configured question budget returns
-    `422`; embedding failures return `502`; database failures return `503`.
+    Plans exceeding the question budget automatically retain fewer candidates.
+    If the first candidate alone exceeds it, the plan contains partial checks.
+    Invalid input returns `422`; embedding failures return `502`; database failures
+    return `503`.
     """
     return service.preview(body)
 
 
 @router.post(
-    "/analyze", tags=["Pipeline"], summary="Analyze a description and explain KTRU candidate compatibility",
+    "/analyses", tags=["Pipeline"], status_code=202,
+    summary="Start an analysis without waiting for retrieval or inference",
+    responses={503: MODEL_ERRORS[503]},
+)
+def start_analysis(
+    body: AnalysisRequest, service: PipelineDependency, response: Response,
+) -> AnalysisJobResponse:
+    """Return a run ID immediately, then retrieve its status with GET /analyses/{run_id}.
+
+    Use this endpoint in browsers and Swagger to avoid long idle HTTP requests.
+    Persistence, retrieval and inference run in a worker independently of polling
+    connections. Active status is cached so a slow database cannot delay polling. A busy
+    model returns 503 before starting another run. Do not resubmit an accepted run;
+    poll its ID instead. Failed runs include an error and any partial result.
+
+    Work runs in this backend process; restarting it interrupts unfinished work.
+    Completed results remain in PostgreSQL and are also available via /results.
+    """
+    run_id = service.submit_analysis(body)
+    response.headers["Location"] = f"analyses/{run_id}"
+    response.headers["Retry-After"] = "2"
+    response.headers["Cache-Control"] = "no-store"
+    return AnalysisJobResponse(run_id=run_id, status="running")
+
+
+@router.get(
+    "/analyses/{run_id}", tags=["Pipeline"], summary="Poll an analysis and read its result or failure",
+    responses={404: {"model": ErrorResponse, "description": "Unknown run ID."},
+               503: MODEL_ERRORS[503]},
+)
+def analysis_job(run_id: RunId, service: PipelineDependency, response: Response) -> AnalysisJobResponse:
+    """Poll every two seconds until status is completed or failed. No models are called.
+
+    A failed run can contain a partial result; inspect complete_inference before
+    interpreting it. Polling can be resumed using the same ID after a disconnect.
+    """
+    run = service.get_analysis_job(run_id)
+    if run is None:
+        raise HTTPException(404, detail={"error": "Unknown analysis run"})
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Retry-After"] = "2"
+    return AnalysisJobResponse(run_id=run_id, status=run["status"],
+                               result=run.get("result"), error=run.get("error"))
+
+
+@router.post(
+    "/analyze", tags=["Pipeline"], summary="Analyze synchronously (use /analyses in browsers)",
     responses=MODEL_ERRORS, response_model_exclude_defaults=True,
 )
 def analyze(body: AnalysisRequest, service: PipelineDependency) -> AnalysisResponse:
@@ -180,6 +232,8 @@ def analyze(body: AnalysisRequest, service: PipelineDependency) -> AnalysisRespo
     and failed model calls are not automatically retried. Database failures return
     `503`.
 
+    For browsers and Swagger, use POST `/analyses` followed by GET
+    `/analyses/{run_id}` to avoid keeping a connection idle during inference.
     A browser disconnect can occur while processing continues. Recover the run ID
     from backend logs and read `/results/{run_id}` after the result is saved.
     Resubmitting `/analyze` creates a new run; it does not resume a prior run or
@@ -197,7 +251,7 @@ def analyze(body: AnalysisRequest, service: PipelineDependency) -> AnalysisRespo
     },
 )
 def saved_result(
-    run_id: Annotated[str, Path(pattern=r"^[0-9]{8}T[0-9]{12}Z_[0-9a-f]{32}$")],
+    run_id: RunId,
     service: PipelineDependency,
 ) -> AnalysisResponse:
     """Return the analysis response already stored for the specified run.

@@ -67,6 +67,7 @@ class PreviewResponse(BaseModel):
     planned_requests: int
     planned_questions: int
     candidates: list[CandidateReference]
+    warnings: list[str] = Field(default_factory=list)
 
 
 class SplitOption(BaseModel):
@@ -111,6 +112,13 @@ class AnalysisResponse(BaseModel):
 class FailureDetail(BaseModel):
     error: str
     result: AnalysisResponse | None = None
+
+
+class AnalysisJobResponse(BaseModel):
+    run_id: str
+    status: Literal["running", "completed", "failed"]
+    result: AnalysisResponse | None = None
+    error: str | None = None
 
 
 class ErrorResponse(BaseModel):

@@ -15,21 +15,34 @@ const analysis: AnalysisResponse = {
 }
 
 function stubFetch(body: unknown, status = 200): FetchLike & { mock: { calls: unknown[][] } } {
-  const fn = vi.fn(async () => new Response(JSON.stringify(body), { status }))
+  const fn = vi.fn(async (url: string) => {
+    if (status === 200 && body && typeof body === 'object' && 'run_id' in body) {
+      const result = body as AnalysisResponse
+      const job = url.endsWith('/analyses')
+        ? { run_id: result.run_id, status: 'running', result: null, error: null }
+        : { run_id: result.run_id, status: 'completed', result, error: null }
+      return new Response(JSON.stringify(job), { status: url.endsWith('/analyses') ? 202 : 200 })
+    }
+    return new Response(JSON.stringify(body), { status })
+  })
   return fn as unknown as FetchLike & { mock: { calls: unknown[][] } }
 }
 
 describe('KtruApiClient.analyze', () => {
-  it('posts the request body as JSON to /analyze', async () => {
+  it('starts an analysis and polls the accepted run without resubmitting', async () => {
     const fetchFn = stubFetch(analysis)
     const client = new KtruApiClient({ baseUrl: '/api', fetch: fetchFn })
     const result = await client.analyze({ text: 'дрель 18 В' })
     const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('/api/analyze')
+    expect(url).toBe('/api/analyses')
     expect(init.method).toBe('POST')
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
     expect(JSON.parse(init.body as string)).toEqual({ text: 'дрель 18 В' })
     expect(result.recommended_candidate).toBe('2620100000@9c8a1a1bba')
+    expect(fetchFn.mock.calls[1]).toEqual([
+      '/api/analyses/r1',
+      { method: 'GET', signal: undefined, cache: 'no-store' },
+    ])
   })
 
   it('survives an aborted request by rethrowing the abort', async () => {
@@ -38,6 +51,73 @@ describe('KtruApiClient.analyze', () => {
     }) as unknown as FetchLike
     const client = new KtruApiClient({ baseUrl: '/api', fetch: fetchFn })
     await expect(client.analyze({ text: 'x' })).rejects.toThrow()
+  })
+
+  it('retries a disconnected poll and running status without starting another run', async () => {
+    vi.useFakeTimers()
+    try {
+      const fn = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ run_id: 'r1', status: 'running' }), { status: 202 }),
+        )
+        .mockRejectedValueOnce(new TypeError('NetworkError when attempting to fetch resource'))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ run_id: 'r1', status: 'running' })))
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ run_id: 'r1', status: 'completed', result: analysis })),
+        )
+      const client = new KtruApiClient({ baseUrl: '/api', fetch: fn })
+      const pending = client.analyze({ text: 'дрель' })
+      await vi.advanceTimersByTimeAsync(4000)
+      expect(await pending).toEqual(analysis)
+      expect(fn.mock.calls.map(([url]) => url)).toEqual([
+        '/api/analyses',
+        '/api/analyses/r1',
+        '/api/analyses/r1',
+        '/api/analyses/r1',
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reports a failed background run with its saved partial result', async () => {
+    const fn = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            run_id: 'r1',
+            status: 'failed',
+            error: 'Classifier timed out',
+            result: analysis,
+          }),
+        ),
+    )
+    const client = new KtruApiClient({ baseUrl: '/api', fetch: fn })
+    const error = (await client.waitForAnalysis('r1').catch((e: unknown) => e)) as ApiError
+    expect(error.status).toBe(502)
+    expect(error.message).toBe('Classifier timed out')
+    expect(error.partialResult?.run_id).toBe('r1')
+  })
+
+  it('stops polling promptly on cancellation while the server keeps the run', async () => {
+    vi.useFakeTimers()
+    try {
+      const controller = new AbortController()
+      const fn = vi.fn(
+        async () => new Response(JSON.stringify({ run_id: 'r1', status: 'running' })),
+      )
+      const client = new KtruApiClient({ baseUrl: '/api', fetch: fn })
+      const pending = client.waitForAnalysis('r1', controller.signal)
+      const assertion = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      await vi.advanceTimersByTimeAsync(0)
+      controller.abort()
+      await assertion
+      await vi.advanceTimersByTimeAsync(4000)
+      expect(fn).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

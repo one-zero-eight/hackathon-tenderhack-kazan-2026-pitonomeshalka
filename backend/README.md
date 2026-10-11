@@ -13,6 +13,22 @@ uv run --locked -m backend.src
 
 Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) to try requests. The OpenAPI schema is at `/openapi.json`. For development, add `--reload`. The direct Uvicorn application import is `backend.src.app:app`.
 
+For browsers and Swagger, use `POST /analyses` with the usual analysis body. It returns `202` and a `run_id` without waiting for retrieval or inference. Poll `GET /analyses/{run_id}` every two seconds until `status` becomes `completed` or `failed`. The response includes the saved `result` and any `error`; a failed run may include a partial result. The frontend uses this flow automatically and retries transient polling failures without submitting duplicate work. Polling can be resumed after a disconnect using the same ID, including through Swagger. `GET /results/{run_id}` still reads saved results, and `POST /analyze` still supports synchronous clients.
+
+The nginx logs for the reported failures show `499` (the client closed its connection), including a request disconnected about 36 seconds after submission while retrieval and subsequent model batches continued. Increasing nginx or Uvicorn keep-alive settings cannot control a timeout imposed by the browser or an intermediary. Submit-and-poll removes the long idle request that triggers this failure; it does not cancel model work when a polling connection closes.
+
+Compose waits for a healthy backend before starting the frontend. nginx resolves upstream service names through Docker DNS every ten seconds, so recreating a backend container does not leave the proxy using its old IP address. Such stale addresses caused separate `502` responses after rebuilding the stack.
+
+Rebuild the Compose images to apply changes; restarting existing containers does not copy edited source into them:
+
+```bash
+docker compose up -d --build backend frontend
+```
+
+Background analysis runs inside the single backend process. Restarting it interrupts unfinished runs; this is not a durable job queue. Completed results remain in PostgreSQL. Wait for `/health` to report `model_busy=false` before restarting during active inference.
+
+Submission reserves a run ID in memory and schedules persistence in the worker. The last 32 job statuses are cached, keeping active polling responsive even when PostgreSQL is slow. Older IDs are read from PostgreSQL. If the database cannot save the initial run, polling reports a failed job for the lifetime of the backend process; that unsaved ID will not survive a restart.
+
 The backend and experiment scripts load the repository-root `.env` through `python-dotenv`, regardless of the working directory. `.env` is ignored by Git; [.example.env](../.example.env) is the shared template with localhost addresses. Set `EMBEDDING_BASE_URL` and `CLASSIFIER_BASE_URL` in `.env` to your actual services. Exported environment variables take precedence; CLI flags override configuration for that invocation. Restart after editing configuration. Missing required variables fail with a setup message rather than silently choosing a service.
 
 The template listens on **8000** and uses `google/embeddinggemma-2` for embeddings. PostgreSQL is required: startup opens the connection pool, applies versioned SQL migrations and logs the database connection result. The Compose service publishes PostgreSQL on `127.0.0.1:${POSTGRES_PORT}` and persists it in the `postgres_data` Docker volume. Credentials and `DATABASE_URL` come from `.env`; `python-dotenv` expands the URL's `${POSTGRES_*}` references. Restarting containers preserves the database.
@@ -83,6 +99,10 @@ Both POST endpoints accept the same body. Only `text` is required:
 
 `scope` defaults to `all`, meaning the experiment's selected snapshot, not every КТРУ record. Other scopes are `drills`, `tools`, `clothing` and `furniture`. `top_k` is 1–32; `chunk_size` is 1–8 questions per logical categorical group, capped by the classifier batch size when batching is enabled. `threshold` is an uncalibrated acceptance threshold between 0 and 1. `extras` accepts caller-supplied `{ "name": "Цвет", "value": "Синий" }` fields. It does not automatically approve adding them to a specification. Text is limited to 10,000 characters.
 
+`BACKEND_MAX_QUESTIONS` is a hard cap on submitted classifier questions, rather than a reason to reject a large shortlist. When a plan exceeds it, the backend removes candidates from the end of the retrieved order until the full checks fit. `top_k` is therefore an upper bound. Family splitting domains remain intact for retained parents, including siblings outside the shortened shortlist; reducing the shortlist cannot by itself resolve a family. Preview and analysis use the same budget adjustment without repeating embedding retrieval.
+
+If even the first candidate exceeds the budget, the backend keeps it and submits a bounded partial plan, prioritizing product identity and measurements explicitly supplied in the description. The response is HTTP `200` with `status=incomplete_inference`, `complete_inference=false` and no recommendation. Skipped characteristic checks remain unknown. Warnings explain reduced coverage in both endpoints. Saved retrieval metadata records the original and retained candidate/question counts under `question_budget`; saved plans also retain `skipped_question_ids`. Increase `BACKEND_MAX_QUESTIONS` and restart if complete checks for that candidate are needed.
+
 `CLASSIFIER_BATCH_SIZE=16` in `.env` packs independent product, categorical and numeric questions with the same description/model into HTTP requests of up to 16 questions. Values 1–64 select a limit; 0 disables packing for comparison or older services. `/preview`, saved plans and request counters report the actual HTTP batches; the total question budget is unchanged. Question IDs are namespaced to avoid collisions between numeric checks, then mapped back for analysis. Each complete outgoing batch is committed to `model_calls` before dispatch; saved records include the original jobs and ID mapping. Earlier successful batches remain available if a later batch fails. The HTTP batches are sent sequentially.
 
 The deployment files under `data/jiwo-deployment` identify the standard jiwo server at revision `8716ababb0924bccadeed3fe1f489d371c554145`, with an FP16 wrapper for V100. That revision already batches questions on the GPU; no server API change is required. GPU batch memory is controlled separately by the server's `JIWO_BATCH_TOKENS`. Its logs report reference-kernel fallbacks for convolution and linear attention, which remain a separate performance consideration.
@@ -95,7 +115,7 @@ curl -sS http://127.0.0.1:8000/analyze \
   --data '{"text":"Нужна аккумуляторная дрель 18 В с реверсом, без ударного режима"}'
 ```
 
-To inspect the plan without calling the classifier, change `/analyze` to `/preview`. Preview candidates are semantic search results, not confirmed matches. Its response has only `planned_requests`, `planned_questions` and `candidates`. The first preview also warms the catalog vector cache.
+To inspect the plan without calling the classifier, change `/analyze` to `/preview`. Preview candidates are semantic search results, not confirmed matches. Its response has `planned_requests`, `planned_questions` and `candidates`, plus `warnings` when the question budget reduces coverage. The first preview also warms the catalog vector cache.
 
 Read an analysis in this order:
 
@@ -140,26 +160,26 @@ This excerpt omits `run_id`, the candidate list, the next question and warnings.
 |---|---|
 | `needs_clarification` | Answer the next question and resubmit the updated description. |
 | `ready_for_review` | Required fields of the compatible candidate are covered; review applicability and evidence. No final code is issued. |
-| `incomplete_inference` | Some scoring calls failed or are missing. Do not interpret absent answers as negative facts. |
+| `incomplete_inference` | Some scoring calls failed, are missing, or were skipped to stay within the question budget. Do not interpret absent answers as negative facts. |
 | `retrieval_miss` | The selected scope contains no candidates; review the catalog and scope. A nonempty semantic index returns nearest candidates even for unrelated input. |
 | `no_compatible_shortlist_candidate` | Review reported contradictions and search coverage. |
 
-`complete_inference` means all planned scoring calls returned validated answers; it does not measure their accuracy. `requires_review` is always `true`: catalog coverage, lifecycle/applicability and categorical text evidence are still experimental. `warnings` exposes unresolved alternatives, conflicting values, truncated retrieval and numbers that could not be bound. `clarifying_question` is `null` when no further input question is needed, but review can still remain.
+`complete_inference` means all planned scoring calls returned validated answers and no checks were skipped for retained candidates or families; it does not measure their accuracy. Removing candidates to fit the budget still allows complete inference for the retained shortlist. `requires_review` is always `true`: catalog coverage, lifecycle/applicability and categorical text evidence are still experimental. `warnings` exposes unresolved alternatives, conflicting values, truncated retrieval, budget adjustments and numbers that could not be bound. `clarifying_question` is `null` when no further input question is needed, but review can still remain.
 
 | HTTP status | Meaning |
 |---|---|
 | `200` | Processing succeeded; inspect the analysis status. |
-| `422` | Invalid input or a plan exceeding the question budget. No classifier calls are submitted; embedding retrieval may already have run. |
+| `422` | Invalid input or unsupported plan data. No classifier calls are submitted; embedding retrieval may already have run. Oversized question plans are adjusted automatically. |
 | `502` | Embedding retrieval or classifier failed. Embedding failures return `detail.result=null`; the failed run and error remain in PostgreSQL. Classifier failures return the compact partial result under `detail.result`, including its `run_id`. |
 | `503` | A model operation is already running, or the database is unavailable. |
 
-Scoring calls run sequentially and stop at the first failure, without automatic retries. A timed-out upstream request may still be running; check the classifier before resubmitting. The lock only covers this process and cannot cancel or track remote work after timeout. Use **one Uvicorn worker**. Analysis waits for completion and can take several minutes; the timeout applies separately to each upstream call. There is no background queue.
+Scoring calls run sequentially and stop at the first failure, without automatic retries. A timed-out upstream request may still be running; check the classifier before resubmitting. The lock only covers this process and cannot cancel or track remote work after timeout. Use **one Uvicorn worker**. Synchronous `/analyze` waits for completion and can take several minutes; the timeout applies separately to each upstream call. `/analyses` returns immediately and performs the same work in a background task.
 
 If Swagger displays `TypeError: NetworkError when attempting to fetch resource`, the browser did not obtain a usable response. This message alone does not identify the cause. An ordinary HTTP `502` or `503` is a readable response rather than a rejected Fetch promise; see [MDN's Fetch documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/fetch). Network/proxy interruptions, browser blocking, or server reloads can interrupt delivery. A timeout is one possibility, not an established diagnosis.
 
 `/analyze` runs in a worker thread and can continue after the browser disconnects, saving its result normally. This implementation does not cancel inference on disconnect. Avoid immediately resubmitting: inspect `/health` for `model_busy`, and look for `Analysis started: run_id=...` and `Analysis saved: run_id=...` in the server log. Retrieve a completed result in Swagger through `GET /results/{run_id}`, or inspect `analysis_runs.result` in PostgreSQL. A recovered partial result still has `complete_inference=false`; retrieval itself returns `200` because reading the saved database result succeeded.
 
-To diagnose a recurring browser failure, open Developer Tools → Network before submitting and inspect the failing `/analyze` request's URL, elapsed time, status and browser Console error. Use Swagger served by the same backend (`/docs`) and confirm its request uses the same scheme, host and port. Test without `--reload` while diagnosing interruptions. If using a reverse proxy, inspect its request/read timeout and logs; `CLASSIFIER_TIMEOUT_SECONDS` does not control the browser-to-backend connection. Increasing Uvicorn's keep-alive timeout does not extend an active request: it applies between requests, as shown in [Uvicorn's HTTP implementation](https://github.com/encode/uvicorn/blob/master/uvicorn/protocols/http/h11_impl.py). An asynchronous submit-and-poll API would avoid holding one HTTP connection open for the complete analysis, but the current endpoint remains synchronous.
+To diagnose a recurring browser failure, open Developer Tools → Network before submitting and inspect the failing request's URL, elapsed time, status and browser Console error. Use Swagger served by the same backend (`/docs`) and confirm its request uses the same scheme, host and port. Test without `--reload` while diagnosing interruptions. If using a reverse proxy, inspect its request/read timeout and logs; `CLASSIFIER_TIMEOUT_SECONDS` does not control the browser-to-backend connection. Increasing Uvicorn's keep-alive timeout does not extend an active request: it applies between requests, as shown in [Uvicorn's HTTP implementation](https://github.com/encode/uvicorn/blob/master/uvicorn/protocols/http/h11_impl.py). Use `/analyses` and poll its run ID to avoid holding one HTTP connection open for the complete analysis.
 
 Backend evidence is stored in these tables:
 
@@ -211,7 +231,7 @@ SELECT checked_at, service, payload FROM connection_checks ORDER BY checked_at D
 | `BACKEND_RESULTS_DIR` | `backend/results`, legacy run import source |
 | `BACKEND_STARTUP_LOG_PATH` | `backend/results/startup_connections.jsonl`, legacy startup log import source |
 | `STARTUP_CHECK_TIMEOUT_SECONDS` | `5`, maximum timeout per startup probe |
-| `BACKEND_MAX_QUESTIONS` | `128` |
+| `BACKEND_MAX_QUESTIONS` | `128`, hard question cap with automatic shortlist reduction and partial-check fallback |
 | `EMBEDDING_BASE_URL` | `http://127.0.0.1:8067` |
 | `EMBEDDING_MODEL` | `google/embeddinggemma-2` |
 | `EMBEDDING_TIMEOUT_SECONDS` | `60`, per embedding request |
@@ -227,6 +247,7 @@ Relative paths resolve from the repository root. Run the offline API and pipelin
 
 ```bash
 uv run --locked python -m unittest discover -s backend/tests -v
+uv run --locked python -m unittest backend.tests.test_question_budget -v
 uv run --locked python -m unittest discover -s experiments -p 'test_*.py' -v
 # Real PostgreSQL checks create and remove isolated test schemas.
 RUN_POSTGRES_TESTS=1 uv run --locked python -m unittest discover -s backend/tests -v

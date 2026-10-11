@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Literal
 
@@ -119,6 +119,7 @@ class Plan:
     spans: list[dict]
     jobs: list[Job]
     scoped_hypotheses: dict[tuple, list[Hypothesis]] = field(default_factory=dict)
+    skipped_question_ids: list[str] = field(default_factory=list)
 
     @property
     def question_count(self) -> int:
@@ -128,7 +129,8 @@ class Plan:
         return {"text": self.text, "import_sha256": self.retrieval.import_sha256,
                 "retrieval": self.retrieval.metadata(), "question_count": self.question_count,
                 "positions": [position_reference(p) for p in self.retrieval.positions],
-                "jobs": [job.snapshot() for job in self.jobs]}
+                "jobs": [job.snapshot() for job in self.jobs],
+                "skipped_question_ids": self.skipped_question_ids}
 
 
 def scalar_span(span: dict, text: str) -> bool:
@@ -143,6 +145,52 @@ def scalar_span(span: dict, text: str) -> bool:
 
 def prepare(retrieval: Retrieval, text: str, chunk_size: int = 4,
             max_questions: int = 128) -> Plan:
+    """Keep a ranked prefix with complete checks, or bound a single large candidate.
+
+    Family domains stay intact for every retained parent: excluding a retrieved
+    sibling must not make an ambiguous family appear resolved.
+    """
+    if max_questions < 1:
+        raise ValueError("BACKEND_MAX_QUESTIONS must be positive")
+    plan = _prepare(retrieval, text, chunk_size)
+    original_questions = plan.question_count
+    if original_questions <= max_questions:
+        return plan
+    for count in range(len(retrieval.positions) - 1, 0, -1):
+        positions = retrieval.positions[:count]
+        codes = {p.code for p in positions}
+        parents = {(p.parent_code, p.parent_version) for p in positions}
+        narrowed = replace(retrieval, positions=positions,
+                           evidence=[hit for hit in retrieval.evidence if hit["code"] in codes],
+                           families=[family for family in retrieval.families
+                                     if (family["code"], family["version"]) in parents],
+                           truncated=True, details=dict(retrieval.details))
+        plan = _prepare(narrowed, text, chunk_size)
+        if plan.question_count <= max_questions:
+            break
+    if plan.question_count > max_questions:
+        # Identity and explicitly supplied measurements get checked first.
+        # Keep unasked hypotheses/bindings so missing evidence remains visible.
+        priority = {"pipeline_product": 0, "pipeline_numeric": 1, "pipeline_facts": 2}
+        jobs, remaining = [], max_questions
+        for job in sorted(plan.jobs, key=lambda job: priority[job.experiment]):
+            questions = dict(list(job.body["questions"].items())[:remaining])
+            plan.skipped_question_ids.extend(qid for qid in job.body["questions"] if qid not in questions)
+            if questions:
+                jobs.append(replace(job, body={**job.body, "questions": questions},
+                                    hypotheses=[h for h in job.hypotheses if h.id in questions]))
+                remaining -= len(questions)
+        plan.jobs = jobs
+    plan.retrieval = replace(plan.retrieval, details={**plan.retrieval.details, "question_budget": {
+        "limit": max_questions, "original_questions": original_questions,
+        "planned_questions": plan.question_count, "original_candidates": len(retrieval.positions),
+        "retained_candidates": len(plan.retrieval.positions),
+        "skipped_questions": len(plan.skipped_question_ids),
+    }})
+    return plan
+
+
+def _prepare(retrieval: Retrieval, text: str, chunk_size: int) -> Plan:
     if not 1 <= chunk_size <= 8:
         raise ValueError("chunk_size must be between 1 and 8")
     hypotheses: dict[tuple, Hypothesis] = {}
@@ -238,10 +286,23 @@ def prepare(retrieval: Retrieval, text: str, chunk_size: int = 4,
         jobs.append(Job("binding_" + ce.identity(*scope), "pipeline_numeric",
                         ce.request_body(text, {"measurement_" + ce.identity(*scope): question}),
                         bindings=numeric_groups.get(scope, [])))
-    plan = Plan(text, retrieval, facts, bindings, spans, jobs, scoped)
-    if plan.question_count > max_questions:
-        raise ValueError(f"Shortlist requires {plan.question_count} questions, above BACKEND_MAX_QUESTIONS={max_questions}; reduce top_k or inspect a narrower scope")
-    return plan
+    return Plan(text, retrieval, facts, bindings, spans, jobs, scoped)
+
+
+def budget_warnings(plan: Plan) -> list[str]:
+    budget = plan.retrieval.details.get("question_budget")
+    if not budget:
+        return []
+    warnings = []
+    if budget["retained_candidates"] < budget["original_candidates"]:
+        warnings.append(f"Список кандидатов сокращён с {budget['original_candidates']} до "
+                        f"{budget['retained_candidates']}, чтобы уложиться в лимит "
+                        f"{budget['limit']} вопросов; часть найденных позиций не проверена.")
+    if budget["skipped_questions"]:
+        warnings.append(f"Лимит {budget['limit']} вопросов достигнут даже для первого кандидата: "
+                        f"пропущено проверок: {budget['skipped_questions']}. Анализ неполный; "
+                        "непроверенные характеристики нельзя считать подтверждёнными или отрицательными.")
+    return warnings
 
 
 def numeric_rule(point: Decimal | str, value: KtruValue) -> bool | None:
@@ -417,6 +478,7 @@ def categorical_rule(char, unit, hypotheses, answers, threshold):
 def resolve_families(plan: Plan, candidates, answers, threshold, complete):
     """Compare cached sibling domains, including children outside the shortlist."""
     assessments = {candidate.position.code: candidate for candidate in candidates}
+    skipped = set(plan.skipped_question_ids)
     families, questions = [], []
     for family in plan.retrieval.families:
         names = {family["name"], *(child["name"] for child in family["children"])}
@@ -446,7 +508,8 @@ def resolve_families(plan: Plan, candidates, answers, threshold, complete):
                     else:
                         scope = ((family["code"], family["version"]), char.code, ce.normalize(char.name), unit)
                         hypotheses = plan.scoped_hypotheses.get(scope, [])
-                        outcomes.append(categorical_rule(char, unit, hypotheses, answers, threshold)[0])
+                        outcomes.append("unknown" if any(h.id in skipped for h in hypotheses)
+                                        else categorical_rule(char, unit, hypotheses, answers, threshold)[0])
                 if "matched" in outcomes or "conflict" in outcomes:
                     checked.add((split["code"], split["name_key"]))
                 if "conflict" in outcomes:
@@ -495,7 +558,8 @@ def resolve_families(plan: Plan, candidates, answers, threshold, complete):
 def analyze(plan: Plan, records: list[dict], threshold: float = .8,
             confirmed_extras: Sequence[dict] = ()) -> Report:
     answers: dict[str, dict] = {}
-    complete = True
+    complete = not plan.skipped_question_ids
+    skipped = set(plan.skipped_question_ids)
     by_job = {record["id"]: record for record in records if "response" in record}
     for job in plan.jobs:
         incoming = by_job.get(job.id, {}).get("response", {}).get("answers", {})
@@ -504,6 +568,7 @@ def analyze(plan: Plan, records: list[dict], threshold: float = .8,
     candidates: list[CandidateAssessment] = []
     properties: set[tuple[str, str]] = set()
     warnings = ["Результат не является окончательным кодом или подтверждением соответствия; применимость и жизненный цикл позиции требуют проверки."]
+    warnings.extend(budget_warnings(plan))
     if plan.retrieval.truncated:
         warnings.append("Часть найденных позиций не вошла в список кандидатов.")
     if any(binding.characteristic.is_numeric for binding in plan.bindings):
@@ -530,6 +595,8 @@ def analyze(plan: Plan, records: list[dict], threshold: float = .8,
                             if accepted(answers.get(h.id), "supported", threshold)}
             ambiguous = not char.is_numeric and char.choice == "one_of" and len(positive_ids) > 1
             for binding in char_bindings:
+                check_skipped = (binding.question_id in skipped
+                                 or any(h.id in skipped for h in binding.hypotheses))
                 if not char.is_numeric:
                     scoped_ids.update(h.id for h in binding.hypotheses)
                     finding = categorical_check(binding, answers, threshold)
@@ -551,6 +618,10 @@ def analyze(plan: Plan, records: list[dict], threshold: float = .8,
                         if conflict:
                             unresolved.add(char.name)
                         finding = Finding(binding, "unknown", "Противоречивые числовые значения." if conflict else "Значение не указано.")
+                if check_skipped:
+                    finding = Finding(binding, "unknown", "Проверка не завершена из-за лимита вопросов.")
+                    uncertain = True
+                    reasons.append(f"{char.name}: {finding.reason}")
                 findings.append(finding)
                 covered |= finding.status == "matched"
                 rejected |= finding.status == "conflict"
@@ -604,7 +675,9 @@ def analyze(plan: Plan, records: list[dict], threshold: float = .8,
     if not candidates:
         status, question = "retrieval_miss", "Уточните наименование и назначение товара или область поиска: кандидаты не найдены."
     elif not complete:
-        status, question = "incomplete_inference", "Завершите проверку характеристик: отсутствующие ответы нельзя считать отрицанием."
+        status = "incomplete_inference"
+        question = ("Проверьте оставшиеся характеристики кандидата: автоматическая проверка достигла лимита вопросов."
+                    if skipped else "Завершите проверку характеристик: отсутствующие ответы нельзя считать отрицанием.")
     elif not survivors and not families:
         status, question = "no_compatible_shortlist_candidate", "Проверьте указанные противоречия; также может потребоваться расширить поиск кандидатов."
     elif split_question or unresolved_families:

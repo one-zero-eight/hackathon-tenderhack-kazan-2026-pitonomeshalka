@@ -10,11 +10,15 @@ const proxy = {
     target: backend,
     changeOrigin: true,
     rewrite: (path: string) => path.replace(/^\/api/, ''),
+    timeout: 600000,
+    proxyTimeout: 600000,
   },
   '/lt': {
     target: languagetool,
     changeOrigin: true,
     rewrite: (path: string) => path.replace(/^\/lt/, ''),
+    timeout: 120000,
+    proxyTimeout: 120000,
   },
 }
 

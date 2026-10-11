@@ -97,13 +97,23 @@ class MeowEmbedClient:
         logger.debug("Embedding payload: %s", json.dumps({"url": url, "request": body}, ensure_ascii=False))
         request = Request(url, data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
                           headers={"Content-Type": "application/json", "Accept": "application/json"})
-        try:
-            with urlopen(request, timeout=self.timeout) as response:
-                result = json.load(response)
-        except HTTPError as error:
-            raise EmbeddingError(f"meow-embed HTTP {error.code}: {error.read().decode(errors='replace')}") from error
-        except (URLError, OSError, ValueError) as error:
-            raise EmbeddingError(f"meow-embed unavailable or invalid response at {url}: {error}") from error
+        last_error = None
+        for attempt in range(3):
+            try:
+                with urlopen(request, timeout=self.timeout) as response:
+                    result = json.load(response)
+                break
+            except HTTPError as error:
+                raise EmbeddingError(f"meow-embed HTTP {error.code}: {error.read().decode(errors='replace')}") from error
+            except (URLError, OSError, ValueError) as error:
+                last_error = error
+                msg = str(error)
+                if attempt < 2 and any(p in msg for p in ("EOF", "unexpected eof", "ConnectionReset", "connection reset", "timed out")):
+                    logger.warning("Retrying embedding request after transient error (attempt %d/3): %s", attempt + 1, error)
+                    import time
+                    time.sleep(1.0)
+                    continue
+                raise EmbeddingError(f"meow-embed unavailable or invalid response at {url}: {error}") from error
         try:
             dense = result["dense"]
             rows, dimensions = dense["shape"]

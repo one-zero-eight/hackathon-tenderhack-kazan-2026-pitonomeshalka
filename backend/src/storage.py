@@ -7,12 +7,13 @@ import json
 import logging
 from pathlib import Path
 import re
+import time
 
 from psycopg import sql
 from psycopg.types.json import Json, Jsonb
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
-from sqlalchemy.orm import selectinload, sessionmaker
+from sqlalchemy.orm import defer, selectinload, sessionmaker
 
 from backend.src.models import CatalogueSource, KtruCharacteristic, KtruPosition, KtruValue
 
@@ -59,8 +60,13 @@ class PostgresStore:
             url, pool_size=settings.database_pool_min_size,
             max_overflow=settings.database_pool_max_size - settings.database_pool_min_size,
             pool_timeout=settings.database_pool_timeout_seconds, pool_pre_ping=True,
+            pool_recycle=180,
             connect_args={"connect_timeout": settings.database_connect_timeout_seconds,
-                          "options": f"-csearch_path={schema},public"},
+                          "options": f"-csearch_path={schema},public",
+                          "keepalives": 1,
+                          "keepalives_idle": 10,
+                          "keepalives_interval": 5,
+                          "keepalives_count": 3},
             execution_options={"schema_translate_map": {"catalogue": self.catalogue_schema}},
         )
         self.session = sessionmaker(self.engine, expire_on_commit=False)
@@ -113,7 +119,12 @@ class PostgresStore:
         with self.session() as session:
             positions = list(session.scalars(
                 select(KtruPosition).where(KtruPosition.import_sha256 == import_sha256, KtruPosition.code.in_(codes))
-                .options(selectinload(KtruPosition.characteristics).selectinload(KtruCharacteristic.values))
+                # Ranking uses vectors in PostgreSQL; analysis needs only catalogue fields.
+                .options(
+                    defer(KtruPosition.embedding),
+                    selectinload(KtruPosition.characteristics).defer(KtruCharacteristic.embedding)
+                    .selectinload(KtruCharacteristic.values).defer(KtruValue.embedding),
+                )
             ))
             # No lazy loading or expired objects may escape into inference.
             session.expunge_all()
@@ -207,7 +218,6 @@ class PostgresStore:
             session.execute(text("SET LOCAL hnsw.iterative_scan = 'strict_order'"))
             session.execute(text("SET LOCAL hnsw.ef_search = 100"))
             session.execute(text("SET LOCAL pg_trgm.similarity_threshold = 0.1"))
-            session.execute(text("SET LOCAL pg_trgm.strict_word_similarity_threshold = 0.4"))
             norm = getattr(func, self.catalogue_schema).norm
             for field, model, column in (("position", KtruPosition, KtruPosition.name),
                                           ("characteristic", KtruCharacteristic, KtruCharacteristic.name),
@@ -232,11 +242,6 @@ class PostgresStore:
                             KtruValue.id.label("value_id"), KtruValue.text.label("value"))
                 modes = [("lexical", func.similarity(norm(column), norm(query)),
                           [norm(column).bool_op("%")(norm(query))])]
-                if field == "value":
-                    # Match a value to a word-bounded extent, not the entire product description.
-                    modes.append(("phrase", func.strict_word_similarity(norm(column), norm(query)),
-                                  [norm(column).bool_op("<<%")(norm(query)),
-                                   norm(column).bool_op("~")("[[:alpha:]]{4}")]))
                 if vector is not None:
                     modes.append(("semantic", model.embedding.cosine_distance(vector),
                                   [model.embedding_config == fingerprint, model.embedding.is_not(None)]))
@@ -282,9 +287,16 @@ class PostgresStore:
         positions = {position.code: position for position in self.get_positions(import_sha256, [h["code"] for h in chosen])}
         return [positions[h["code"]] for h in chosen], chosen, count
 
-    def _write(self, statement, parameters):
-        with self.engine.begin() as connection:
-            connection.exec_driver_sql(statement, parameters)
+    def _write(self, statement, parameters, retries=2):
+        for attempt in range(retries + 1):
+            try:
+                with self.engine.begin() as connection:
+                    connection.exec_driver_sql(statement, parameters)
+                return
+            except Exception:
+                if attempt == retries:
+                    raise
+                time.sleep(0.5)
 
     def begin_run(self, run_id, request):
         self._write("INSERT INTO analysis_runs(id,status,request) VALUES (%s,'running',%s)", (run_id, Jsonb(request)))

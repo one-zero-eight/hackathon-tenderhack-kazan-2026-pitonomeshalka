@@ -94,12 +94,18 @@ describe('CsvBatchPanel', () => {
     expect(wrapper.text()).toContain('Проверено 1 из 2')
   })
 
-  it('with the default wiring posts every data row to /api/analyze', async () => {
-    const fetchMock = vi.fn(async (...args: [string, RequestInit]) =>
-      args[0].includes('/api/analyze')
-        ? new Response(JSON.stringify(analysisFor('x')), { status: 200 })
-        : new Response('{}', { status: 500 }),
-    )
+  it('with the default wiring starts and polls an analysis for every data row', async () => {
+    const fetchMock = vi.fn(async (...args: [string, RequestInit]) => {
+      if (args[0] === '/api/analyses') {
+        return new Response(JSON.stringify({ run_id: 'r1', status: 'running' }), { status: 202 })
+      }
+      if (args[0] === '/api/analyses/r1') {
+        return new Response(
+          JSON.stringify({ run_id: 'r1', status: 'completed', result: analysisFor('x') }),
+        )
+      }
+      return new Response('{}', { status: 500 })
+    })
     vi.stubGlobal('fetch', fetchMock)
     try {
       const wrapper = mountWithPrime(CsvBatchPanel)
@@ -108,7 +114,7 @@ describe('CsvBatchPanel', () => {
       await flushPromises()
       await flushPromises()
       await flushPromises()
-      const analyzeCalls = fetchMock.mock.calls.filter(([url]) => url.includes('/api/analyze'))
+      const analyzeCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/analyses')
       expect(analyzeCalls).toHaveLength(2)
       const texts = analyzeCalls.map(([, init]) => JSON.parse(init.body as string).text)
       expect(texts).toEqual(['аккумуляторная дрель;18 В;реверс', 'садовый насос;500 Вт'])
