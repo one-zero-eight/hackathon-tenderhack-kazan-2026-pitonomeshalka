@@ -654,3 +654,8 @@ data/*
 .mimosa/
 superpowers/
 plans/
+
+# Frontend shared helper modules must stay tracked: the global Python `lib/`
+# rule (line 142) otherwise excludes frontend/src/lib entirely.
+!frontend/src/lib/
+!frontend/src/lib/**
