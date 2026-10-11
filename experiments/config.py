@@ -26,6 +26,11 @@ def env(name):
     return value
 
 
+def env_or(name, default):
+    value = os.environ.get(name)
+    return value if value and value.strip() else default
+
+
 def env_path(name):
     value = Path(env(name)).expanduser()
     return value if value.is_absolute() else ROOT / value
@@ -67,6 +72,9 @@ class Settings:
     top_k: int = configured("PIPELINE_TOP_K", int)
     chunk_size: int = configured("PIPELINE_CHUNK_SIZE", int)
     threshold: float = configured("PIPELINE_THRESHOLD", float)
+    redis_url: str = field(default_factory=lambda: env_or("REDIS_URL", ""), repr=False)
+    history_ttl_seconds: int = field(default_factory=lambda: int(env_or("HISTORY_TTL_SECONDS", "604800")))
+    history_max_items: int = field(default_factory=lambda: int(env_or("HISTORY_MAX_ITEMS", "5")))
 
     def __post_init__(self):
         for name, value in (("CLASSIFIER_BASE_URL", self.classifier_base_url), ("EMBEDDING_BASE_URL", self.embedding_base_url)):
@@ -102,6 +110,14 @@ class Settings:
             raise ValueError("PIPELINE_THRESHOLD must be finite and between 0 and 1")
         if not self.embedding_model.strip() or not self.classifier_model.strip() or not self.host.strip():
             raise ValueError("Model IDs and BACKEND_HOST must not be blank")
+        if self.history_ttl_seconds < 1:
+            raise ValueError("HISTORY_TTL_SECONDS must be positive")
+        if self.history_max_items < 1 or self.history_max_items > 50:
+            raise ValueError("HISTORY_MAX_ITEMS must be 1–50")
+        if self.redis_url:
+            parsed = urlsplit(self.redis_url)
+            if parsed.scheme not in {"redis", "rediss"}:
+                raise ValueError("REDIS_URL must use redis:// or rediss://")
 
     @classmethod
     def from_environment(cls):

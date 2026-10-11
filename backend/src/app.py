@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from experiments import classifier_experiments as ce
 from experiments.embedding_retrieval import MeowEmbedClient
 
+from backend.src.history import SearchHistoryStore
 from backend.src.routes import router
 from backend.src.service import InferenceFailure, InvalidPlan, ModelBusy, PipelineService
 from backend.src.settings import Settings
@@ -67,8 +68,15 @@ def create_app(
                 logging.getLogger("uvicorn.error").warning("No active catalogue; run scripts/load_db.py --activate %s", configuration.catalog_key)
             application.state.pipeline = PipelineService(configuration, client_factory,
                                                         embedding_client_factory, store=store)
+            history = SearchHistoryStore(
+                configuration.redis_url,
+                max_items=configuration.history_max_items,
+                ttl_seconds=configuration.history_ttl_seconds,
+            )
+            application.state.history = history
             yield
         finally:
+            history.close()
             await run_in_threadpool(store.close)
 
     application = FastAPI(
