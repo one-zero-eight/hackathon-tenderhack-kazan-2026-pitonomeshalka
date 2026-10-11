@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import Button from 'primevue/button'
 import { computed, onMounted, ref, watch } from 'vue'
-import type { AnalysisScope } from '../api/types'
 import { useSpellcheck, type SpellcheckClient } from '../composables/useSpellcheck'
 import { useTextSearch, type TextSearchClient } from '../composables/useTextSearch'
 import { getSessionId } from '../lib/sessionId'
@@ -33,7 +32,6 @@ const ERROR_CARD =
   'card-registry space-y-2 border-accent-200 bg-accent-50 p-4 text-sm text-accent-700'
 
 const text = ref('')
-const scope = ref<AnalysisScope>('all')
 const topK = ref(DEFAULT_TOP_K)
 const spell = useSpellcheck(props.spellcheck ?? lt, { debounceMs: 300 })
 const searchState = useTextSearch(props.search ?? api)
@@ -87,7 +85,7 @@ function applyOne(index: number, replacement: string) {
 }
 
 function run(expandedTopK?: number) {
-  void searchState.search(text.value, scope.value, expandedTopK)
+  void searchState.search(text.value, 'all', expandedTopK)
 }
 
 function choose(optionId: string) {

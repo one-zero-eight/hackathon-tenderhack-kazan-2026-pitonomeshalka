@@ -57,6 +57,15 @@ describe('TextSearchPanel', () => {
     expect(wrapper.text()).toContain('26.02.10.110')
   })
 
+  it('no longer exposes a section dropdown', () => {
+    const search = { analyze: vi.fn(async () => analysis) }
+    const wrapper = mountWithPrime(TextSearchPanel, {
+      props: { spellcheck: quietSpellcheck, search },
+    })
+    expect(wrapper.find('[data-test="scope"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Раздел')
+  })
+
   it('disables search while the query is empty', async () => {
     const search = fakeSearch(async () => analysis)
     const wrapper = mountWithPrime(TextSearchPanel, {
