@@ -1,9 +1,9 @@
 <script lang="ts" setup>
 import Button from 'primevue/button'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { SpellMatch } from '../lib/corrections'
 
-defineProps<{ matches: SpellMatch[] }>()
+const props = defineProps<{ matches: SpellMatch[] }>()
 
 defineEmits<{
   apply: [index: number, replacement: string]
@@ -11,7 +11,11 @@ defineEmits<{
 }>()
 
 const MAX_SUGGESTIONS = 3
+const FIX_ALL_HINT = 'Применяет первое предложенное исправление для каждой опечатки'
 const expanded = ref(true)
+
+/** «Исправить всё» only makes sense when LanguageTool offered at least one variant. */
+const hasSuggestions = computed(() => props.matches.some((m) => m.replacements.length > 0))
 
 const PANEL_CLASS =
   'card-registry animate-rise-in space-y-3 border-l-4 border-l-warning-500 ' + 'bg-warning-50 p-4'
@@ -33,7 +37,9 @@ const TOGGLE_CLASS =
         Похоже, есть опечатки — проверьте перед поиском
       </p>
       <Button
-        class="ml-auto"
+        class="hover:bg-warning-100 ml-auto"
+        v-if="hasSuggestions"
+        v-tooltip.top="FIX_ALL_HINT"
         @click="$emit('applyAll')"
         data-test="apply-all"
         label="Исправить всё"

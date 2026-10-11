@@ -92,4 +92,79 @@ describe('CsvBatchPanel', () => {
     expect(analyze).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Проверено 1 из 2')
   })
+
+  it('with the default wiring posts every data row to /api/analyze', async () => {
+    const fetchMock = vi.fn(async (...args: [string, RequestInit]) =>
+      args[0].includes('/api/analyze')
+        ? new Response(JSON.stringify(analysisFor('x')), { status: 200 })
+        : new Response('{}', { status: 500 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const wrapper = mountWithPrime(CsvBatchPanel)
+      await pickFile(wrapper)
+      await wrapper.find('[data-test="start"]').trigger('click')
+      await flushPromises()
+      await flushPromises()
+      await flushPromises()
+      const analyzeCalls = fetchMock.mock.calls.filter(([url]) => url.includes('/api/analyze'))
+      expect(analyzeCalls).toHaveLength(2)
+      const texts = analyzeCalls.map(([, init]) => JSON.parse(init.body as string).text)
+      expect(texts).toEqual(['аккумуляторная дрель', 'садовый насос'])
+      expect(wrapper.text()).toContain('Проверено 2 из 2')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('shows a visible error when the CSV is empty', async () => {
+    const wrapper = mountWithPrime(CsvBatchPanel, {
+      props: { analyze: async (text: string) => analysisFor(text), correct: async () => null },
+    })
+    await pickFile(wrapper, '')
+    expect(wrapper.find('[data-test="file-error"]').text()).toContain('нет строк данных')
+    expect(wrapper.find('[data-test="start"]').exists()).toBe(false)
+  })
+
+  it('shows a visible error when the chosen column has no non-empty cells', async () => {
+    const analyze = vi.fn(async (text: string) => analysisFor(text))
+    const wrapper = mountWithPrime(CsvBatchPanel, { props: { analyze, correct: async () => null } })
+    await pickFile(wrapper, 'код;описание\n1;\n2;\n')
+    await wrapper.find('[data-test="start"]').trigger('click')
+    await flushPromises()
+    expect(analyze).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="file-error"]').text()).toContain('непустой')
+  })
+
+  it('shows a visible error when the file cannot be read', async () => {
+    const wrapper = mountWithPrime(CsvBatchPanel, {
+      props: { analyze: async (text: string) => analysisFor(text), correct: async () => null },
+    })
+    const file = new File(['x'], 'broken.csv', { type: 'text/csv' })
+    file.text = () => Promise.reject(new Error('unreadable'))
+    const input = wrapper.find('[data-test="file-input"]').element as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [file], configurable: true })
+    await wrapper.find('[data-test="file-input"]').trigger('change')
+    await flushPromises()
+    expect(wrapper.find('[data-test="file-error"]').text()).toContain('Не удалось прочитать')
+  })
+
+  it('accepts a headerless single-row csv and analyzes the chosen column', async () => {
+    const analyze = vi.fn(async (text: string) => analysisFor(text))
+    const wrapper = mountWithPrime(CsvBatchPanel, { props: { analyze, correct: async () => null } })
+    await pickFile(
+      wrapper,
+      'Отвертка аккумуляторная Bort BAS-48N-Lt,КИТАЙ,' +
+        'Вес 900 г | Высота упаковки 200 мм | Глубина упаковки 240 мм | Цвет синий',
+    )
+    expect(wrapper.text()).toContain('строк: 1')
+    await wrapper.find('[data-test="column"]').setValue('0')
+    await wrapper.find('[data-test="start"]').trigger('click')
+    await flushPromises()
+    await flushPromises()
+    expect(analyze).toHaveBeenCalledWith(
+      'Отвертка аккумуляторная Bort BAS-48N-Lt',
+      expect.anything(),
+    )
+  })
 })
