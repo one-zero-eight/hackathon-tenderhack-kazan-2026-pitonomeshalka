@@ -6,7 +6,8 @@ Start from the repository root:
 cp .example.env .env  # First setup only; edit .env for your services.
 uv sync --locked
 docker compose up -d --wait postgres
-uv run --locked -m backend.src.migrate --import-files  # Import existing files once; safe to repeat.
+uv run --locked python -m scripts.load_db --ktru-only --activate ktru
+uv run --locked python -m scripts.embed_db --batch-size 16384
 uv run --locked -m backend.src
 ```
 
@@ -18,17 +19,27 @@ The template listens on **8000** and uses `google/embeddinggemma-2` for embeddin
 
 The classifier's `/health` and meow-embed's `/models` are checked concurrently at every startup. These checks validate model IDs without inference or embedding. Results appear in the server log and the `connection_checks` table, with UTC timestamps, endpoints, elapsed times and model details or errors. Checks use `STARTUP_CHECK_TIMEOUT_SECONDS`, capped by each service's timeout. Failed upstream checks are logged and allow startup; a database connection or migration failure prevents startup. `/preview` needs the embedder; `/analyze` also needs the classifier.
 
-On the first startup with an empty database catalog, the backend imports `KTRU_CATALOG_PATH` if present, otherwise the supplied XML under `KTRU_XML_DIR`. It stores a versioned snapshot and normalized positions/facts under `KTRU_CATALOG_KEY`. Subsequent startups load this catalog from PostgreSQL. Original XML files remain import sources. To replace the catalog, import the new snapshot with `PostgresStore.save_catalog(catalog, key)` and restart the backend.
+Import a relational XML snapshot with `scripts.load_db` and activate it under `KTRU_CATALOG_KEY` (`ktru` in the template). Backend startup does not import a catalogue or build catalogue embeddings. `backend.src.migrate` applies schema migrations only; the standalone experiment JSON cache is not used by relational retrieval.
 
-Catalog vectors are built lazily on the first search, in batches of 32 unique normalized names, then committed atomically to PostgreSQL. The current snapshot has 1,302 entries and 283 unique names. pgvector computes cosine similarity for names in the requested scope; Python preserves the existing code/version diversification. Subsequent searches embed only the incoming description. Cached catalog vectors survive restarts and are also reused in memory. Changes to the name set, embedding model or prompts create a new index fingerprint. To rebuild after changing weights under the same model ID, delete the relevant row from `embedding_indexes` and restart; dependent vectors are removed automatically.
+### Backfill catalogue embeddings
 
-`backend.src.migrate --import-files` imports existing catalog/vector caches, saved backend runs and startup logs without inference or re-embedding. Run imports are transactional and idempotent; existing database runs are skipped. Source files are preserved, but new backend runs use PostgreSQL exclusively. Standalone experiment CLIs retain their file export/cache behavior.
+With PostgreSQL running and `EMBEDDING_BASE_URL` pointing to an embed service that provides the configured 768-dimensional model, run from the repository root:
 
-There is no shared-word requirement or automatic lexical fallback. Retrieval takes up to `EMBEDDING_MAX_NAMES` nearest distinct names within the requested scope (four in the template), then interleaves their code/version alternatives up to `top_k`. Similarity scores are rankings, not acceptance probabilities; there is no similarity acceptance cutoff. Even unrelated inputs can get nearest candidates, which the classifier must assess. A semantic shortlist still cannot establish complete catalog coverage or final eligibility.
+```bash
+uv run --locked python -m scripts.embed_db
+# Optional overrides:
+uv run --locked python -m scripts.embed_db --catalog-key ktru --batch-size 32
+```
+
+The job pins the active import at startup and fills PostgreSQL `embedding` and `embedding_config` columns. Product documents contain the position name; characteristic documents contain the product and characteristic names on separate lines; qualitative value documents add the value text. Only actual characteristics and qualitative values without parsing issues are included. Numeric ranges are not embedded. All position names in the snapshot are processed, including positions not currently eligible for retrieval.
+
+Each batch commits separately, so rerun the same command after a failure or interruption to resume. Matching embeddings are skipped; embeddings from a different model/prompt/format fingerprint are replaced. Identical documents within a batch share one embedding request entry. `EMBEDDING_BATCH_SIZE` defaults to 32 in the template; `--batch-size` overrides the number of database rows processed per batch. Catalogue text is sent to `EMBEDDING_BASE_URL`; the job does not contact the classifier. Completed vectors survive restarts.
+
+The backend uses lexical retrieval until a matching position embedding exists, then combines lexical and semantic field-level results with rank fusion and name diversification. Readiness is not a full-coverage check: semantic search can become available while the backfill is still running. Changing `EMBEDDING_MODEL` or the prompts requires running the backfill again. Similarity scores rank candidates; they are not acceptance probabilities or proof of final eligibility.
 
 The client uses meow-embed's [`POST /embed` API](https://github.com/dantetemplar/meow-embed), decodes base64 float32 vectors, validates model identity and dimensions, and normalizes vectors for cosine search. It sends explicit query/document prefixes from [EmbeddingGemma 2's configuration](https://huggingface.co/google/embeddinggemma-2/blob/main/config_sentence_transformers.json).
 
-Embedding logs use the server logger. At `LOG_LEVEL=info`, they show the model, endpoint, text counts, timeout, request duration and returned dimensions; index build/batch progress, cache loading or reuse; search scope, candidate count and query/total timing. Cache corruption and request failures produce warnings. Set `LOG_LEVEL=debug` to include complete outgoing embedding payloads. Each saved analysis report in `analysis_runs.analysis` also records the index source (`built`, `postgresql` or `memory`), name count, dimensions and embedding search timings under `analysis.retrieval`. Outgoing embedding payloads, dimensions, timings and failures are also retained in `embedding_calls`; analysis calls carry their run ID. Startup's `/models` check does not build vectors; the first search does.
+Embedding logs use the server logger. At `LOG_LEVEL=info`, they show the model, endpoint, text counts, timeout, request duration and returned dimensions; index build/batch progress, cache loading or reuse; search scope, candidate count and query/total timing. Cache corruption and request failures produce warnings. Set `LOG_LEVEL=debug` to include complete outgoing embedding payloads. Each saved analysis report in `analysis_runs.analysis` also records the index source (`built`, `postgresql` or `memory`), name count, dimensions and embedding search timings under `analysis.retrieval`. Outgoing online embedding payloads, dimensions, timings and failures are also retained in `embedding_calls`; analysis calls carry their run ID. The backfill logs batch progress but does not persist request evidence. Startup's `/models` check does not build vectors; use `scripts.embed_db` to prepare them.
 
 ```text
 backend/
@@ -53,7 +64,7 @@ backend/
 |---|---|
 | `GET /health` | `{"status":"ok","model_busy":false}`. Checks backend startup; does not probe the classifier. |
 | `GET /health/model` | `{"status":"ok","model":"jiwo-4b"}`. Probes the classifier using `CLASSIFIER_HEALTH_TIMEOUT_SECONDS` and validates model identity. |
-| `POST /preview` | Embedding shortlist, planned classifier request/question counts and candidate code, version and name. May build the vector cache; performs no classifier calls or analysis-run writes. |
+| `POST /preview` | Retrieval shortlist, planned classifier request/question counts and candidate code, version and name. Uses prepared catalogue embeddings when available; performs no classifier calls or analysis-run writes. |
 | `POST /analyze` | Provisional recommendation, interpreted properties, explained candidates, missing fields and next question. Saves evidence. |
 | `GET /results/{run_id}` | Read an already saved response without contacting either model. Use the run ID from server logs after a lost browser response. Returns `404` if unknown or still processing. |
 
