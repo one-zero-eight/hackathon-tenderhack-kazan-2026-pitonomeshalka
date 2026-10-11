@@ -651,6 +651,9 @@ MigrationBackup/
 
 data/*
 
+# Compressed database snapshots are shared separately, not committed.
+seeds/*.dump*
+
 .mimosa/
 superpowers/
 plans/

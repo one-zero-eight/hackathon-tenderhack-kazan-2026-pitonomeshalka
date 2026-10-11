@@ -8,6 +8,7 @@
 
 # Данные и результаты: монтируются томами, в образ не должны попадать
 data
+seeds
 backend/results
 backend/.env
 experiments/results
