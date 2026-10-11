@@ -76,6 +76,8 @@ class SearchHistoryStore:
                     self._client.set(result_key, payload, ex=self._ttl_seconds)
         except redis.RedisError as error:
             logger.warning("Failed to save search history: %s", error)
+        except (TypeError, ValueError) as error:
+            logger.warning("Cached result is not JSON-serializable: %s", error)
 
     def get_result(self, session_id: str, query: str) -> dict | None:
         """Return the cached analysis result for a session's query, if any."""

@@ -1,8 +1,15 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 import redis
+from fastapi.testclient import TestClient
 
+from backend.src.app import create_app
 from backend.src.history import SearchHistoryStore
+from backend.src.schemas import AnalysisResponse
+from backend.src.settings import Settings
+from backend.tests.memory_store import MemoryStore
 
 
 class FakePipeline:
@@ -111,6 +118,12 @@ class SearchHistoryStoreTests(unittest.TestCase):
         self.assertEqual(store.get("s1"), ["дрель"])
         self.assertIsNone(store.get_result("s1", "дрель"))
 
+    def test_non_serializable_result_keeps_query_without_result(self):
+        store = self.make_store()
+        store.add("s1", "дрель", {"x": object()})
+        self.assertEqual(store.get("s1"), ["дрель"])
+        self.assertEqual(self.result_keys(store), [])
+
     def test_unknown_query_returns_none(self):
         store = self.make_store()
         store.add("s1", "дрель", {"run_id": "r1"})
@@ -142,6 +155,87 @@ class SearchHistoryStoreTests(unittest.TestCase):
         store.add("s1", "дрель", {"run_id": "r1"})
         self.assertEqual(store.get("s1"), [])
         self.assertIsNone(store.get_result("s1", "дрель"))
+
+
+class FakeModel:
+    """Classifier double whose health probe reports the configured model."""
+
+    def __init__(self, model_name):
+        self.model_name = model_name
+
+    def factory(self, base_url, timeout):
+        return self
+
+    def health(self):
+        return dict(model=self.model_name)
+
+
+class FakeEmbedder:
+    """Embedder double whose health probe echoes the configured model ID."""
+
+    def __init__(self):
+        self.model_id = None
+
+    def factory(self, base_url, model_id, timeout):
+        self.model_id = model_id
+        return self
+
+    def health(self):
+        return dict(id=self.model_id, type="dense", dimensions=3)
+
+
+class FakeStorage(MemoryStore):
+    """MemoryStore plus the active-import lookup performed at app startup."""
+
+    def get_active_import(self, key):
+        return "fixture-import"
+
+
+class HistoryRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.settings = Settings(classifier_batch_size=0,
+                                 results_dir=Path(self.directory.name) / "runs",
+                                 startup_log_path=Path(self.directory.name) / "startup.jsonl",
+                                 embedding_cache_path=Path(self.directory.name) / "embeddings.json",
+                                 redis_url="")
+        self.app = create_app(self.settings, client_factory=FakeModel(self.settings.classifier_model).factory,
+                              embedding_client_factory=FakeEmbedder().factory,
+                              store_factory=lambda _: FakeStorage())
+        self.client = self.enterContext(TestClient(self.app))
+        self.store = SearchHistoryStore("")
+        self.store._client = FakeRedis()
+        self.app.state.history = self.store
+        self.result = AnalysisResponse(run_id="r1", status="ready_for_review", complete_inference=True,
+                                       recommended_candidate=None, requires_review=True, properties=[],
+                                       candidates=[], clarifying_question=None, warnings=[]).model_dump(mode="json")
+
+    def test_post_history_with_result_then_get_it_back(self):
+        response = self.client.post("/history", json={"session_id": "s1", "query": "дрель", "result": self.result})
+        self.assertEqual(response.status_code, 200, response.text)
+        cached = self.client.get("/history/s1/result", params={"query": "дрель"})
+        self.assertEqual(cached.status_code, 200, cached.text)
+        self.assertEqual(cached.json()["run_id"], "r1")
+
+    def test_get_result_without_saved_result_returns_404(self):
+        response = self.client.post("/history", json={"session_id": "s1", "query": "дрель"})
+        self.assertEqual(response.status_code, 200, response.text)
+        cached = self.client.get("/history/s1/result", params={"query": "дрель"})
+        self.assertEqual(cached.status_code, 404)
+        self.assertEqual(cached.json()["detail"], {"error": "No cached result for this query"})
+
+    def test_get_result_unknown_query_returns_404(self):
+        response = self.client.post("/history", json={"session_id": "s1", "query": "дрель", "result": self.result})
+        self.assertEqual(response.status_code, 200, response.text)
+        cached = self.client.get("/history/s1/result", params={"query": "шуруповерт"})
+        self.assertEqual(cached.status_code, 404)
+        self.assertEqual(cached.json()["detail"], {"error": "No cached result for this query"})
+
+    def test_post_history_still_accepts_query_only(self):
+        response = self.client.post("/history", json={"session_id": "s1", "query": "дрель"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.client.get("/history/s1").json(), {"queries": ["дрель"]})
 
 
 if __name__ == "__main__":

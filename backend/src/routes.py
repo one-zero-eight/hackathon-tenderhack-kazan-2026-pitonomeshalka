@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
 from backend.src.schemas import (
     AnalysisRequest,
@@ -228,7 +228,7 @@ def saved_result(
 
 
 @router.post(
-    "/history", tags=["History"], summary="Save a search query to session history",
+    "/history", tags=["History"], summary="Save a search query — and optionally its analysis — to session history",
 )
 def add_history(
     body: HistoryAddRequest,
@@ -240,10 +240,45 @@ def add_history(
     removed, and the list is trimmed to the configured maximum (default 5).
     Keys expire after the configured TTL (default 7 days).
 
+    `result` is optional; send the `AnalysisResponse` returned by `/analyze` to
+    cache it for the query. A later `GET /history/{session_id}/result?query=…`
+    then returns that saved response without rerunning the pipeline. Omitting
+    `result` (or sending `null`) saves the query only.
+
     Returns 200 on success even when Redis is unavailable — history is
     best-effort. No content body.
     """
-    history.add(body.session_id, body.query)
+    history.add(body.session_id, body.query, body.result.model_dump() if body.result is not None else None)
+
+
+@router.get(
+    "/history/{session_id}/result", tags=["History"],
+    summary="Read the analysis cached for a saved query", response_model_exclude_defaults=True,
+    responses={
+        404: {"model": ErrorResponse, "description": "The session has no cached result for this query."},
+    },
+)
+def get_history_result(
+    session_id: Annotated[str, Path(min_length=1, max_length=64)],
+    query: Annotated[str, Query(min_length=1, max_length=500)],
+    history: HistoryDependency,
+) -> AnalysisResponse:
+    """Return the analysis response cached together with a saved query.
+
+    Use the same `query` text that was saved with `POST /history` along with the
+    `AnalysisResponse` from `/analyze`. The response has the same schema and
+    interpretation as `/analyze`; empty optional candidate lists are omitted.
+
+    This endpoint reads Redis only. It does not call either model, touch
+    PostgreSQL or create an analysis run, and it remains available while the
+    classifier is busy. `404` means the query has no cached result — either the
+    query was saved without one or nothing was saved at all; run `/analyze`
+    again in that case.
+    """
+    result = history.get_result(session_id, query)
+    if result is None:
+        raise HTTPException(404, detail={"error": "No cached result for this query"})
+    return AnalysisResponse.model_validate(result)
 
 
 @router.get(
