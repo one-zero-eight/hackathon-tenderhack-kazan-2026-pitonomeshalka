@@ -14,7 +14,14 @@ from experiments.embedding_retrieval import MeowEmbedClient
 
 from backend.src.history import SearchHistoryStore
 from backend.src.routes import router
-from backend.src.service import InferenceFailure, InvalidPlan, ModelBusy, PipelineService
+from backend.src.service import (
+    ClarificationConflict,
+    InferenceFailure,
+    InvalidPlan,
+    ModelBusy,
+    PipelineService,
+    UnknownRun,
+)
 from backend.src.settings import Settings
 from backend.src.startup import check_connections
 from backend.src.storage import PostgresStore
@@ -26,6 +33,14 @@ def model_busy_handler(request: Request, error: ModelBusy) -> JSONResponse:
         content={"detail": {"error": str(error)}},
         headers={"Retry-After": "5"},
     )
+
+
+def unknown_run_handler(request: Request, error: UnknownRun) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": {"error": str(error)}})
+
+
+def clarification_conflict_handler(request: Request, error: ClarificationConflict) -> JSONResponse:
+    return JSONResponse(status_code=409, content={"detail": {"error": str(error)}})
 
 
 def inference_failure_handler(request: Request, error: InferenceFailure) -> JSONResponse:
@@ -89,6 +104,8 @@ def create_app(
     application.add_exception_handler(ModelBusy, model_busy_handler)
     application.add_exception_handler(InferenceFailure, inference_failure_handler)
     application.add_exception_handler(InvalidPlan, invalid_plan_handler)
+    application.add_exception_handler(UnknownRun, unknown_run_handler)
+    application.add_exception_handler(ClarificationConflict, clarification_conflict_handler)
     def database_error_handler(request, error):
         logging.getLogger("uvicorn.error").exception("PostgreSQL request failed")
         return JSONResponse(status_code=503, content={"detail": {"error": "Database unavailable"}})

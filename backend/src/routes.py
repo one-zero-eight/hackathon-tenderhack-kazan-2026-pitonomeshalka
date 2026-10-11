@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from backend.src.schemas import (
     AnalysisRequest,
     AnalysisResponse,
+    ClarifyRequest,
     ErrorResponse,
     HealthResponse,
     HistoryAddRequest,
@@ -186,6 +187,46 @@ def analyze(body: AnalysisRequest, service: PipelineDependency) -> AnalysisRespo
     maintain a clarification session. Include any clarification in the new text.
     """
     return service.analyze(body)
+
+
+@router.post(
+    "/clarify", tags=["Pipeline"],
+    summary="Answer the deterministic clarification question of a saved analysis run",
+    response_model_exclude_defaults=True,
+    responses={
+        404: {"model": ErrorResponse, "description": "Run is unknown or no result has been saved."},
+        409: {"model": ErrorResponse,
+              "description": "The question is stale (the run's current question differs) or the option is unknown. "
+                             "Nothing was written; re-read the current clarification and answer that question."},
+        503: {"model": ErrorResponse, "description": "PostgreSQL is unavailable."},
+    },
+)
+def clarify(body: ClarifyRequest, service: PipelineDependency) -> AnalysisResponse:
+    """Narrow a saved `needs_clarification` run to one KTRU code by answering its current question.
+
+    Send the `run_id` plus the `question_id` and chosen `option_id` from the current
+    `clarification`. The answer is validated against the run's current deterministic
+    question: a stale `question_id` or an unknown `option_id` returns `409` without
+    writing anything. Answers are recorded in the run's `clarification_state.json`
+    artifact; the saved analysis result itself is never modified.
+
+    The response is the same `AnalysisResponse` schema as `/analyze`, rebuilt from the
+    original saved result plus clarification fields:
+
+    - With more than one remaining candidate, `clarification` holds the next question
+      (at most three rounds; the last one sets `manual_choice`).
+    - With exactly one remaining candidate, `final_card` holds the full KTRU position
+      schema with `requires_review: true`; the choice is final for this user path, but
+      legal applicability and lifecycle still need review.
+    - With the "Ничего из перечисленного" option, `suggest_expand` is `true` and there
+      is no next question; start a new `/analyze` with a larger `top_k` instead.
+
+    This endpoint reads and writes PostgreSQL only. It performs no classifier,
+    embedding or other model calls and runs while the classifier is busy.
+    Invalid bodies return `422`; an unknown run or a run without a saved result
+    returns `404`; database failures return `503`.
+    """
+    return service.clarify(body)
 
 
 @router.get(

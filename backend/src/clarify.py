@@ -2,6 +2,14 @@
 
 from experiments.classifier_experiments import identity
 
+CLARIFICATION_STATE = "clarification_state.json"
+
+
+def initial_candidate_codes(result: dict) -> list[str]:
+    """Live candidate codes from the saved result, in result order; rejected ones never ask questions."""
+    return [candidate["code"] for candidate in result.get("candidates", [])
+            if candidate.get("status") != "rejected"]
+
 
 def _question_id(round_number, kind, source, candidate_codes):
     return "clarification_" + identity(

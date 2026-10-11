@@ -1,5 +1,6 @@
 """Render typed product assessments using the unchanged public API schemas."""
 
+from backend.src.clarify import build_clarification, initial_candidate_codes
 from backend.src.pipeline import Report
 from backend.src.schemas import AnalysisResponse, Candidate, ExtraPropertyDecision, Property
 
@@ -24,3 +25,16 @@ def analysis_response(report: Report, run_id: str) -> AnalysisResponse:
         candidates=candidates, clarifying_question=report.clarifying_question, warnings=report.warnings,
         detected_families=report.families,
     )
+
+
+def clarification_response(result: dict, **fields) -> AnalysisResponse:
+    """Rebuild the public response from the untouched saved result plus clarification fields."""
+    return AnalysisResponse.model_validate({**result, **fields})
+
+
+def with_primary_clarification(result: dict) -> AnalysisResponse:
+    """Attach the round-one question to a fresh response; the saved result dict stays untouched."""
+    codes = initial_candidate_codes(result)
+    if result.get("status") == "needs_clarification" and len(codes) >= 2:
+        return clarification_response(result, clarification=build_clarification(result, codes, 1))
+    return AnalysisResponse.model_validate(result)

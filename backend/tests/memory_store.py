@@ -13,6 +13,7 @@ class MemoryStore:
         self.artifacts = {}
         self.calls = {}
         self.checks = []
+        self.positions = {}
 
     def initialize(self):
         pass
@@ -22,6 +23,9 @@ class MemoryStore:
 
     def get_catalog(self, key):
         return deepcopy(self.catalogs.get(key))
+
+    def get_active_import(self, key):
+        return self.catalogs.get(key)
 
     def save_catalog(self, catalog, key=None):
         if key is not None:
@@ -46,9 +50,17 @@ class MemoryStore:
 
     def save_plan(self, run_id, plan):
         self.runs[run_id]["plan"] = deepcopy(plan["requests"])
+        self.runs[run_id]["catalogue_import_sha256"] = plan.get("import_sha256")
 
     def save_artifact(self, run_id, name, payload):
         self.artifacts[run_id][name] = deepcopy(payload)
+
+    def get_artifact(self, run_id, name):
+        return deepcopy(self.artifacts.get(run_id, {}).get(name))
+
+    def get_positions(self, import_sha256, codes):
+        stored = self.positions.get(import_sha256, {})
+        return [deepcopy(stored[code]) for code in stored if code in codes]
 
     def start_model_call(self, run_id, ordinal, outgoing):
         self.calls[run_id].append({"outgoing": deepcopy(outgoing), "status": "running"})

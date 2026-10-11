@@ -12,8 +12,10 @@ from experiments.classifier_pipeline import batch_jobs, unpack_records
 from experiments.embedding_retrieval import EmbeddingError, MeowEmbedClient
 
 from backend.src import pipeline
-from backend.src.presentation import analysis_response
-from backend.src.schemas import AnalysisRequest, AnalysisResponse, CandidateReference, PreviewResponse
+from backend.src.clarify import CLARIFICATION_STATE, apply_option, build_clarification, initial_candidate_codes
+from backend.src.final_card import build_final_card
+from backend.src.presentation import analysis_response, clarification_response, with_primary_clarification
+from backend.src.schemas import AnalysisRequest, AnalysisResponse, CandidateReference, ClarifyRequest, PreviewResponse
 from backend.src.storage import current_run
 
 logger = logging.getLogger("uvicorn.error")
@@ -32,6 +34,14 @@ class InferenceFailure(RuntimeError):
     def __init__(self, message, result=None):
         super().__init__(message)
         self.result = result
+
+
+class UnknownRun(LookupError):
+    """The analysis run is unknown or its result has not been saved yet."""
+
+
+class ClarificationConflict(ValueError):
+    """The submitted answer does not match the run's current deterministic clarification."""
 
 
 class PipelineService:
@@ -155,18 +165,20 @@ class PipelineService:
             records, failure = self._run_jobs(plan, requests, run_id, request.threshold, request.scope)
             report = pipeline.analyze(plan, unpack_records(records), request.threshold, request.confirmed_extras())
             result = analysis_response(report, run_id)
+            saved_result = result.model_dump(mode="json", exclude_defaults=True)
             details = dict(
                 mode="live", run_id=run_id, import_sha256=plan.retrieval.import_sha256,
                 planned_requests=len(requests), planned_questions=plan.question_count,
                 successful_requests=sum("response" in record for record in records), analysis=report.snapshot(),
             )
-            self.store.finish_run(run_id, details, result.model_dump(mode="json", exclude_defaults=True), failure)
+            # The saved result stays the untouched primary analysis; clarification state lives in run_artifacts.
+            self.store.finish_run(run_id, details, saved_result, failure)
             finalized = True
             logger.info("Analysis saved: run_id=%s status=%s complete_inference=%s elapsed=%.3fs storage=postgresql",
                         run_id, result.status, result.complete_inference, perf_counter() - started)
             if failure:
                 raise InferenceFailure(failure, result)
-            return result
+            return with_primary_clarification(saved_result)
         except Exception as error:
             if saved and not finalized:
                 try:
@@ -177,3 +189,42 @@ class PipelineService:
         finally:
             current_run.reset(token)
             self.model_lock.release()
+
+    def clarify(self, request: ClarifyRequest) -> AnalysisResponse:
+        """Advance the deterministic clarification; pure database work, never the model lock."""
+        run = self.store.get_run(request.run_id)
+        if run is None or run["result"] is None:
+            raise UnknownRun("Run is unknown or its result is not saved yet")
+        result = run["result"]
+        state = self.store.get_artifact(request.run_id, CLARIFICATION_STATE) or {
+            "round": 1, "candidate_codes": initial_candidate_codes(result), "question_id": None, "answers": []}
+        current = build_clarification(result, state["candidate_codes"], state["round"])
+        if request.question_id != current["question_id"]:
+            raise ClarificationConflict("The question does not match the run's current clarification state")
+        try:
+            narrowed = apply_option(current, request.option_id, state["candidate_codes"])
+        except ValueError as error:
+            raise ClarificationConflict(str(error)) from error
+        answers = [*(state.get("answers") or []),
+                   {"question_id": request.question_id, "option_id": request.option_id}]
+        if not narrowed:
+            state = {"round": state["round"], "candidate_codes": [], "question_id": request.question_id,
+                     "answers": answers}
+            self.store.save_artifact(request.run_id, CLARIFICATION_STATE, state)
+            return clarification_response(result, suggest_expand=True)
+        if len(narrowed) == 1:
+            state = {"round": state["round"], "candidate_codes": narrowed, "question_id": request.question_id,
+                     "answers": answers}
+            self.store.save_artifact(request.run_id, CLARIFICATION_STATE, state)
+            positions = {position.code: position for position in
+                         self.store.get_positions(run.get("catalogue_import_sha256"), narrowed)}
+            position = positions.get(narrowed[0])
+            if position is None:
+                raise ClarificationConflict("The selected candidate is missing from the run's catalogue import")
+            return clarification_response(result, final_card=build_final_card(position, answers))
+        following_round = state["round"] + 1
+        following = build_clarification(result, narrowed, following_round)
+        state = {"round": following_round, "candidate_codes": narrowed, "question_id": following["question_id"],
+                 "answers": answers}
+        self.store.save_artifact(request.run_id, CLARIFICATION_STATE, state)
+        return clarification_response(result, clarification=following, manual_choice=following["manual_choice"])
