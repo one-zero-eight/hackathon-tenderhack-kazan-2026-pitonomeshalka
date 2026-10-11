@@ -2,6 +2,9 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RobotSearching from './RobotSearching.vue'
 
+const eyesTransform = (wrapper: ReturnType<typeof mount>) =>
+  (wrapper.find('.robot-eyes').element as SVGElement).style.transform
+
 describe('RobotSearching', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -42,5 +45,35 @@ describe('RobotSearching', () => {
     wrapper.unmount()
     expect(clearSpy).toHaveBeenCalled()
     clearSpy.mockRestore()
+  })
+
+  it('turns the eyes toward the cursor', async () => {
+    const wrapper = mount(RobotSearching, { props: { phrases: ['Раз'] } })
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 200, clientY: 0 }))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(eyesTransform(wrapper)).toBe('translate(5.00px, 0.00px)')
+    wrapper.unmount()
+  })
+
+  it('returns the eyes to center when the cursor leaves the window', async () => {
+    const wrapper = mount(RobotSearching, { props: { phrases: ['Раз'] } })
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 200, clientY: 0 }))
+    await vi.advanceTimersByTimeAsync(600)
+    document.documentElement.dispatchEvent(new MouseEvent('mouseleave'))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(eyesTransform(wrapper)).toBe('translate(0.00px, 0.00px)')
+    wrapper.unmount()
+  })
+
+  it('ignores the cursor when reduced motion is preferred', async () => {
+    const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockReturnValue({
+      matches: true,
+    } as MediaQueryList)
+    const wrapper = mount(RobotSearching, { props: { phrases: ['Раз'] } })
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 200, clientY: 0 }))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(eyesTransform(wrapper)).toBe('')
+    wrapper.unmount()
+    matchMediaSpy.mockRestore()
   })
 })

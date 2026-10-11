@@ -7,7 +7,7 @@ export type AnalysisStatus =
   | 'needs_clarification'
   | 'ready_for_review'
 
-export type CandidateStatus = 'supported' | 'uncertain' | 'rejected'
+export type CandidateStatus = 'compatible' | 'uncertain' | 'rejected'
 
 export type ExtraAction =
   'map_and_validate' | 'do_not_add' | 'review_before_add' | 'additional_field_policy_unknown'

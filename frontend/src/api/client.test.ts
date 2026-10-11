@@ -73,6 +73,34 @@ describe('KtruApiClient error handling', () => {
     const error = await client.analyze({ text: 'x' }).catch((e: unknown) => e)
     expect((error as ApiError).status).toBe(504)
   })
+
+  it('fills in the candidate arrays the backend omits when empty', async () => {
+    const sparse = {
+      run_id: 'r2',
+      status: 'needs_clarification',
+      complete_inference: true,
+      recommended_candidate: null,
+      properties: [],
+      candidates: [
+        {
+          code: '32.99.53.130-00000001',
+          version: '4',
+          name: 'Доска магнитно-маркерная',
+          status: 'uncertain',
+          reasons: ['Вид товара не подтверждён описанием.'],
+        },
+      ],
+      clarifying_question: 'Уточните вид самого товара.',
+      warnings: [],
+    }
+    const fetchFn = stubFetch(sparse)
+    const client = new KtruApiClient({ baseUrl: '/api', fetch: fetchFn })
+    const result = await client.analyze({ text: 'доска' })
+    expect(result.candidates[0].missing_required).toEqual([])
+    expect(result.candidates[0].unmatched_properties).toEqual([])
+    expect(result.candidates[0].extra_characteristics).toEqual([])
+    expect(result.warnings).toEqual([])
+  })
 })
 
 describe('KtruApiClient.preview and health', () => {

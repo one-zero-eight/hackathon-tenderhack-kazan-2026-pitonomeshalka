@@ -6,6 +6,9 @@ import { PortalPreset } from './theme'
 
 createApp(App)
   .use(PrimeVue, {
-    theme: { preset: PortalPreset, options: { darkModeSelector: '.app-dark' } },
+    theme: {
+      preset: PortalPreset,
+      options: { darkModeSelector: '.app-dark', cssLayer: { name: 'primevue' } },
+    },
   })
   .mount('#app')

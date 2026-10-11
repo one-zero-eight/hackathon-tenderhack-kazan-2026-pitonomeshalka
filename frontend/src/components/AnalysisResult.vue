@@ -15,61 +15,63 @@ const recommended = computed(() => {
   )
   return { code, name: found?.name ?? null }
 })
+
+const WARNINGS_CLASS =
+  'card-registry border-l-4 border-l-warning-500 bg-warning-50 p-4 text-warning-700'
 </script>
 
 <template>
-  <section class="space-y-4" data-test="result">
+  <section class="animate-rise-in space-y-4" data-test="result">
     <div class="flex flex-wrap items-center gap-3">
-      <h2 class="text-lg font-semibold text-ink-900">Результат анализа</h2>
+      <h2 class="eyebrow">Результат анализа</h2>
       <StatusChip :status="result.status" />
-      <span class="text-xs text-warning-700" v-if="!result.complete_inference">
+      <span class="text-xs font-semibold text-warning-700" v-if="!result.complete_inference">
         модель ответила не полностью
       </span>
     </div>
 
     <div
-      class="rounded-2xl border border-primary-200 bg-primary-50 p-5"
+      class="card-registry border-l-4 border-l-primary-600 p-5"
       v-if="recommended"
       data-test="recommended"
     >
-      <p class="text-xs font-medium tracking-wide text-primary-700 uppercase">
-        Предварительная рекомендация
-      </p>
-      <p class="mt-1 font-mono text-xl font-semibold break-all text-primary-800">
+      <p class="eyebrow text-primary-600">Предварительная рекомендация</p>
+      <p class="mt-2 font-mono text-2xl font-bold tracking-tight break-all text-primary-700">
         {{ recommended.code }}
       </p>
-      <p class="mt-1 text-sm text-ink-700" v-if="recommended.name">{{ recommended.name }}</p>
-      <p class="mt-2 text-xs text-ink-500">Код требует финальной проверки специалистом</p>
+      <p class="mt-1 text-[15px] font-semibold text-ink-900" v-if="recommended.name">
+        {{ recommended.name }}
+      </p>
+      <p class="mt-3 border-t border-ink-200 pt-2 text-xs text-ink-500">
+        Код требует финальной проверки специалистом
+      </p>
     </div>
 
     <div
-      class="rounded-2xl border border-ink-200 bg-white p-4 text-sm text-ink-700"
+      class="card-registry border-l-4 border-l-primary-400 bg-primary-50 p-4 text-sm"
       v-if="result.clarifying_question"
     >
-      <span class="font-medium text-primary-700">Уточнение: </span>
-      {{ result.clarifying_question }}
+      <span class="font-semibold text-primary-700">Уточнение: </span>
+      <span class="text-ink-700">{{ result.clarifying_question }}</span>
     </div>
 
-    <div class="space-y-3 rounded-2xl border border-ink-200 bg-white p-5">
-      <h3 class="text-sm font-semibold text-ink-700">Характеристики из запроса</h3>
+    <div class="card-registry space-y-3 p-5">
+      <h3 class="eyebrow border-b border-ink-200 pb-2">Характеристики из запроса</h3>
       <PropertiesTable :properties="result.properties" />
       <p class="text-sm text-ink-400" v-if="result.properties.length === 0">
         Характеристики не распознаны
       </p>
     </div>
 
-    <div
-      class="rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700"
-      v-if="result.warnings.length"
-    >
-      <p class="font-medium">Предупреждения</p>
+    <div v-if="result.warnings.length" :class="WARNINGS_CLASS">
+      <p class="font-semibold">Предупреждения</p>
       <ul class="mt-1 list-disc space-y-1 pl-5">
         <li v-for="warning in result.warnings" :key="warning">{{ warning }}</li>
       </ul>
     </div>
 
     <div class="space-y-3">
-      <h3 class="text-sm font-semibold text-ink-700">
+      <h3 class="eyebrow border-b border-ink-200 pb-2">
         Кандидаты КТРУ ({{ result.candidates.length }})
       </h3>
       <CandidateBlock

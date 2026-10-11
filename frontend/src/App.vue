@@ -12,19 +12,25 @@ const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
 ]
 
 const tab = ref<Tab>('text')
+
+const TAB_CLASS =
+  '-mb-px border-b-[3px] px-1 pt-1 pb-3 text-[13px] font-bold tracking-[0.06em] ' +
+  'uppercase transition'
 </script>
 
 <template>
   <div class="flex min-h-screen flex-col">
-    <header class="border-b border-ink-200 bg-white">
+    <div class="h-1 bg-primary-600"></div>
+    <header class="border-b border-ink-200 bg-white shadow-card">
       <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-6 pt-5">
         <span
-          class="grid h-11 w-11 place-items-center rounded-2xl bg-primary-600 text-white shadow-sm"
+          class="grid h-11 w-11 place-items-center bg-primary-600 shadow-card"
+          aria-hidden="true"
         >
-          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24">
+          <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24">
             <rect
               height="11"
-              rx="4"
+              rx="2"
               stroke="currentColor"
               stroke-width="1.8"
               width="14"
@@ -34,26 +40,26 @@ const tab = ref<Tab>('text')
             <circle cx="10" cy="13" fill="currentColor" r="1.4" />
             <circle cx="14" cy="13" fill="currentColor" r="1.4" />
             <path d="M12 8V4.5" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
-            <circle cx="12" cy="3.5" fill="currentColor" r="1.3" />
+            <circle cx="12" cy="3.5" fill="#db2b21" r="1.6" />
           </svg>
         </span>
         <div>
-          <h1 class="text-lg font-semibold text-ink-900">КТРУ Ассистент</h1>
-          <p class="text-sm text-ink-500">Подбор кода КТРУ по описанию товара</p>
+          <h1 class="text-xl font-bold text-ink-900">КТРУ Ассистент</h1>
+          <p class="text-[13px] text-ink-500">Подбор кода КТРУ по описанию товара</p>
         </div>
         <div class="ml-auto">
           <HealthBadge />
         </div>
       </div>
-      <nav class="mx-auto mt-4 flex max-w-5xl gap-1 px-6" data-test="tabs">
+      <nav class="mx-auto mt-4 flex max-w-5xl gap-6 px-6" data-test="tabs">
         <button
-          class="rounded-t-xl border-b-2 px-4 py-2.5 text-sm font-medium transition"
           v-for="item in TABS"
-          :class="
+          :class="[
+            TAB_CLASS,
             tab === item.id
               ? 'border-primary-600 text-primary-700'
-              : 'border-transparent text-ink-500 hover:text-ink-900'
-          "
+              : 'border-transparent text-ink-500 hover:text-ink-900',
+          ]"
           :key="item.id"
           @click="tab = item.id"
           type="button"
@@ -67,10 +73,5 @@ const tab = ref<Tab>('text')
       <TextSearchPanel v-show="tab === 'text'" />
       <CsvBatchPanel v-show="tab === 'csv'" />
     </main>
-
-    <footer class="mx-auto w-full max-w-5xl px-6 pb-8 text-xs text-ink-400">
-      Коды КТРУ носят предварительный характер и требуют финальной проверки специалистом. Орфография
-      проверяется сервером LanguageTool, анализ выполняется моделью Nimble.
-    </footer>
   </div>
 </template>

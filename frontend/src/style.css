@@ -1,50 +1,230 @@
+@layer theme, base, primevue, components, utilities;
+
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Портал поставщиков: Open Sans как базовый шрифт интерфейса */
+  --font-sans:
+    'Open Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, 'Liberation Mono',
+    monospace;
 
-  /* Portal Postavshchikov blue */
-  --color-primary-50: #eef4ff;
-  --color-primary-100: #dfe9ff;
-  --color-primary-200: #c5d8ff;
-  --color-primary-300: #a1bfff;
-  --color-primary-400: #7b9dfa;
-  --color-primary-500: #5b7ef2;
-  --color-primary-600: #0d4cd3;
-  --color-primary-700: #0c3fae;
-  --color-primary-800: #0e3589;
-  --color-primary-900: #12306b;
+  /* «Реестровый» синий — фирменный цвет портала (#264B82) */
+  --color-primary-50: #f4f7fb;
+  --color-primary-100: #e7eef7;
+  --color-primary-200: #c9d8ea;
+  --color-primary-300: #a3bbda;
+  --color-primary-400: #6f92c0;
+  --color-primary-500: #47699e;
+  --color-primary-600: #264b82;
+  --color-primary-700: #1f3e6c;
+  --color-primary-800: #183154;
+  --color-primary-900: #122541;
 
-  /* Neutral ink scale */
-  --color-ink-900: #101828;
-  --color-ink-700: #344054;
-  --color-ink-500: #667085;
-  --color-ink-400: #98a2b3;
-  --color-ink-300: #d0d5dd;
-  --color-ink-200: #eaecf0;
-  --color-ink-100: #f2f4f7;
-  --color-ink-50: #f9fafb;
+  /* «Красный маяк» — CTA-акцент портала (#DB2B21) */
+  --color-accent-50: #fceeec;
+  --color-accent-100: #f9dad6;
+  --color-accent-200: #f1b4ae;
+  --color-accent-500: #db2b21;
+  --color-accent-600: #c1251c;
+  --color-accent-700: #961d16;
 
-  --color-success-50: #ecfdf3;
-  --color-success-200: #abefc6;
-  --color-success-500: #17b26a;
-  --color-success-700: #067647;
+  /* Нейтральная шкала чернил (#1A1A1A база, #6B727C вторичный — контраст 4.9:1) */
+  --color-ink-900: #1a1a1a;
+  --color-ink-700: #43484f;
+  --color-ink-500: #6b727c;
+  --color-ink-400: #9aa1ab;
+  --color-ink-300: #c8ccd2;
+  --color-ink-200: #e4e6e9;
+  --color-ink-100: #f0f1f3;
+  --color-ink-50: #f7f8f9;
 
-  --color-warning-50: #fffaeb;
-  --color-warning-200: #fedf89;
-  --color-warning-500: #f79009;
-  --color-warning-700: #b54708;
+  --color-success-50: #e9f7f1;
+  --color-success-200: #b4e3ce;
+  --color-success-500: #0d9b68;
+  --color-success-700: #08714c;
 
-  --color-danger-50: #fef3f2;
-  --color-danger-200: #fecdca;
-  --color-danger-500: #f04438;
-  --color-danger-700: #b42318;
+  --color-warning-50: #fdf5e6;
+  --color-warning-200: #f3dfae;
+  --color-warning-500: #dd920d;
+  --color-warning-700: #8f5d07;
+
+  /* Тени как в ките: карточка с волосяной рамкой и мягкой глубиной */
+  --shadow-card: 0 1px 2px 0 rgba(34, 36, 38, 0.15);
+  --shadow-lift: 0 6px 20px -6px rgba(18, 37, 65, 0.18);
+
+  --radius-chip: 6px;
+
+  --animate-rise-in: rise-in 0.28s ease-out both;
+
+  @keyframes rise-in {
+    from {
+      transform: translateY(6px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
 }
 
 body {
   margin: 0;
-  background-color: #f4f7fc;
+  background-color: var(--color-ink-50);
   color: var(--color-ink-900);
+  font-size: 14px;
+  line-height: 1.6;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Строгая геометрия кита: прямые углы контролов, скругление только у служебных чипов */
+@layer components {
+  .card-registry {
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--color-ink-200);
+    border-radius: 0;
+    background-color: #ffffff;
+  }
+
+  .eyebrow {
+    color: var(--color-ink-500);
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .field-base {
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease,
+      box-shadow 0.15s ease;
+    border: 1px solid var(--color-primary-100);
+    border-radius: 0;
+    background-color: var(--color-primary-100);
+    color: var(--color-ink-900);
+  }
+
+  .field-base::placeholder {
+    color: var(--color-ink-400);
+  }
+
+  .field-base:hover {
+    border-color: var(--color-primary-200);
+  }
+
+  .field-base:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(38, 75, 130, 0.14);
+    border-color: var(--color-primary-600);
+    background-color: #ffffff;
+  }
+
+  .btn-cta {
+    transition:
+      background-color 0.15s ease,
+      box-shadow 0.15s ease;
+    box-shadow: var(--shadow-card);
+    border-radius: 0;
+    background-color: var(--color-accent-500);
+    color: #ffffff;
+  }
+
+  .btn-cta:hover:not(:disabled) {
+    background-color: var(--color-accent-600);
+  }
+
+  .btn-cta:disabled {
+    background-color: var(--color-accent-200);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: var(--radius-chip);
+    padding: 3px 8px;
+    font-weight: 600;
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
+
+/* Скин PrimeVue под кит: прямые углы, вторичные кнопки — контурные синие */
+@layer components {
+  .p-button {
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+    border-radius: 0;
+    font-weight: 600;
+  }
+
+  .p-button:focus-visible {
+    outline: 3px solid rgba(38, 75, 130, 0.35);
+    outline-offset: 2px;
+  }
+
+  .p-button-secondary {
+    border: 1px solid var(--color-ink-300);
+    background-color: #ffffff;
+    color: var(--color-primary-600);
+  }
+
+  .p-button-secondary:hover:not(:disabled) {
+    border-color: var(--color-primary-600);
+    background-color: var(--color-primary-50);
+    color: var(--color-primary-700);
+  }
+
+  .p-button-text {
+    color: var(--color-primary-600);
+  }
+
+  .p-tag {
+    border-radius: var(--radius-chip);
+    font-weight: 600;
+  }
+
+  .p-progressbar {
+    border-radius: 0;
+  }
+
+  .p-progressbar .p-progressbar-value {
+    background-color: var(--color-primary-600);
+  }
+
+  .p-progressspinner circle {
+    stroke: var(--color-primary-600);
+  }
+
+  .p-accordionpanel {
+    border-radius: 0;
+  }
+
+  .p-accordionheader:hover {
+    background-color: var(--color-primary-50);
+  }
+}
+
+:focus-visible {
+  outline: 3px solid rgba(38, 75, 130, 0.35);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

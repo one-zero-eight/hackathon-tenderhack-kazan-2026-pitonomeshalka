@@ -12,7 +12,7 @@ interface ChipMeta {
 }
 
 const LABELS: Record<ChipStatus, ChipMeta> = {
-  supported: { label: 'Подтверждён', tone: 'tone-success', severity: 'success' },
+  compatible: { label: 'Подходит', tone: 'tone-success', severity: 'success' },
   uncertain: { label: 'Требует проверки', tone: 'tone-warning', severity: 'warn' },
   rejected: { label: 'Отклонён', tone: 'tone-danger', severity: 'danger' },
   ready_for_review: { label: 'Готов к проверке', tone: 'tone-primary', severity: 'info' },
@@ -40,6 +40,6 @@ const meta = computed<ChipMeta>(
 
 <template>
   <span class="inline-flex" :class="meta.tone" data-test="chip">
-    <Tag :severity="meta.severity" :value="meta.label" rounded />
+    <Tag :severity="meta.severity" :value="meta.label" />
   </span>
 </template>

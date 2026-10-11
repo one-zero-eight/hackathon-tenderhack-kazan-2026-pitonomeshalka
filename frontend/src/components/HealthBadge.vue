@@ -44,27 +44,26 @@ const label = computed(
 )
 
 const TONES = {
-  loading: 'text-ink-400',
-  ok: 'text-success-700',
-  busy: 'text-warning-700',
-  down: 'text-danger-700',
+  loading: 'bg-ink-100 text-ink-500',
+  ok: 'bg-success-50 text-success-700',
+  busy: 'bg-warning-50 text-warning-700',
+  down: 'bg-accent-50 text-accent-700',
 } as const
 
 const DOTS = {
   loading: 'bg-ink-300',
   ok: 'bg-success-500',
   busy: 'bg-warning-500',
-  down: 'bg-danger-500',
+  down: 'bg-accent-500',
 } as const
 
 const BADGE =
-  'inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white ' +
-  'px-3 py-1.5 text-xs font-medium'
+  'inline-flex items-center gap-2 border border-ink-200 px-3 py-1.5 text-xs font-semibold'
 </script>
 
 <template>
   <span :class="[BADGE, TONES[state]]" data-test="health">
-    <span class="h-2 w-2 rounded-full" :class="DOTS[state]" />
+    <span class="h-2 w-2" :class="DOTS[state]" />
     {{ label }}
   </span>
 </template>

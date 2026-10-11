@@ -16,16 +16,82 @@ const PHRASE_MS = 2200
 const index = ref(0)
 let timer: ReturnType<typeof setInterval> | undefined
 
+const stageEl = ref<HTMLElement | null>(null)
+const eyesEl = ref<SVGGElement | null>(null)
+
+const EYE_REACH_X = 7
+const EYE_REACH_Y = 5.5
+const CURSOR_REACH = 280
+const GAZE_EASE = 0.16
+
+let gazeRaf = 0
+let gazeX = 0
+let gazeY = 0
+let gazeTargetX = 0
+let gazeTargetY = 0
+let motionReduced = false
+
+function gazeTick() {
+  gazeX += (gazeTargetX - gazeX) * GAZE_EASE
+  gazeY += (gazeTargetY - gazeY) * GAZE_EASE
+
+  if (Math.abs(gazeTargetX - gazeX) < 0.05 && Math.abs(gazeTargetY - gazeY) < 0.05) {
+    gazeX = gazeTargetX
+    gazeY = gazeTargetY
+    gazeRaf = 0
+  } else {
+    gazeRaf = requestAnimationFrame(gazeTick)
+  }
+
+  if (eyesEl.value) {
+    eyesEl.value.style.transform = `translate(${gazeX.toFixed(2)}px, ${gazeY.toFixed(2)}px)`
+  }
+}
+
+function lookAt(event: MouseEvent) {
+  if (motionReduced || !stageEl.value) return
+
+  const rect = stageEl.value.getBoundingClientRect()
+  const dx = event.clientX - (rect.left + rect.width / 2)
+  const dy = event.clientY - (rect.top + rect.height / 2)
+  const distance = Math.hypot(dx, dy)
+  if (distance < 1) return
+
+  const strength = Math.min(distance, CURSOR_REACH) / CURSOR_REACH
+  gazeTargetX = (dx / distance) * EYE_REACH_X * strength
+  gazeTargetY = (dy / distance) * EYE_REACH_Y * strength
+
+  if (!gazeRaf) gazeRaf = requestAnimationFrame(gazeTick)
+}
+
+function restGaze() {
+  if (motionReduced) return
+  gazeTargetX = 0
+  gazeTargetY = 0
+  if (!gazeRaf) gazeRaf = requestAnimationFrame(gazeTick)
+}
+
 onMounted(() => {
   timer = setInterval(() => {
     index.value = (index.value + 1) % props.phrases.length
   }, PHRASE_MS)
+
+  motionReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!motionReduced) {
+    window.addEventListener('pointermove', lookAt)
+    document.documentElement.addEventListener('mouseleave', restGaze)
+  }
 })
 
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+  clearInterval(timer)
+  window.removeEventListener('pointermove', lookAt)
+  document.documentElement.removeEventListener('mouseleave', restGaze)
+  if (gazeRaf) cancelAnimationFrame(gazeRaf)
+})
 
-const CHIP_BASE = 'robot-chip absolute rounded-full border border-primary-200 bg-white'
-const CHIP_TEXT = 'px-2.5 py-1 text-[11px] font-medium text-primary-700'
+const CHIP_BASE = 'robot-chip absolute border border-primary-200 bg-white'
+const CHIP_TEXT = 'px-2.5 py-1 font-mono text-[11px] font-semibold text-primary-600'
 </script>
 
 <template>
@@ -35,7 +101,7 @@ const CHIP_TEXT = 'px-2.5 py-1 text-[11px] font-medium text-primary-700'
     data-test="robot"
     role="status"
   >
-    <div class="relative h-56 w-56">
+    <div class="relative h-56 w-56" ref="stageEl">
       <div class="robot-ring absolute inset-4 rounded-full border-2 border-primary-200"></div>
       <div class="robot-ring absolute inset-10 rounded-full border border-primary-100"></div>
       <span class="top-4 left-0" :class="[CHIP_BASE, CHIP_TEXT]"> 26.02.10 </span>
@@ -47,7 +113,7 @@ const CHIP_TEXT = 'px-2.5 py-1 text-[11px] font-medium text-primary-700'
       </span>
       <svg class="robot-float relative h-full w-full" viewBox="0 0 200 200">
         <line
-          stroke="#0d4cd3"
+          stroke="#264b82"
           stroke-linecap="round"
           stroke-width="4"
           x1="100"
@@ -55,26 +121,26 @@ const CHIP_TEXT = 'px-2.5 py-1 text-[11px] font-medium text-primary-700'
           y1="34"
           y2="52"
         />
-        <circle class="robot-antenna" cx="100" cy="27" fill="#f04438" r="7" />
+        <circle class="robot-antenna" cx="100" cy="27" fill="#db2b21" r="7" />
         <rect
           fill="#ffffff"
           height="56"
           rx="18"
-          stroke="#c5d8ff"
+          stroke="#c9d8ea"
           stroke-width="3"
           width="84"
           x="58"
           y="50"
         />
-        <rect fill="#0e2a66" height="36" rx="10" width="64" x="68" y="60" />
-        <g class="robot-eyes">
-          <circle cx="88" cy="77" fill="#7dd3fc" r="6" />
-          <circle cx="112" cy="77" fill="#7dd3fc" r="6" />
+        <rect fill="#183154" height="36" rx="10" width="64" x="68" y="60" />
+        <g class="robot-eyes" ref="eyesEl">
+          <circle cx="88" cy="77" fill="#a3bbda" r="6" />
+          <circle cx="112" cy="77" fill="#a3bbda" r="6" />
         </g>
         <path
           d="M92 88 Q100 95 108 88"
           fill="none"
-          stroke="#7dd3fc"
+          stroke="#a3bbda"
           stroke-linecap="round"
           stroke-width="3"
         />
@@ -82,26 +148,26 @@ const CHIP_TEXT = 'px-2.5 py-1 text-[11px] font-medium text-primary-700'
           fill="#ffffff"
           height="52"
           rx="16"
-          stroke="#c5d8ff"
+          stroke="#c9d8ea"
           stroke-width="3"
           width="72"
           x="64"
           y="112"
         />
-        <circle cx="100" cy="134" fill="#dfe9ff" r="9" />
+        <circle cx="100" cy="134" fill="#e7eef7" r="9" />
         <path
           d="M96 134 L99 137 L105 130"
           fill="none"
-          stroke="#0d4cd3"
+          stroke="#264b82"
           stroke-linecap="round"
           stroke-linejoin="round"
           stroke-width="2.5"
         />
-        <rect fill="#eef4ff" height="7" rx="3.5" width="44" x="78" y="150" />
-        <rect class="robot-arm-l" fill="#dfe9ff" height="34" rx="9" width="18" x="40" y="120" />
-        <rect class="robot-arm-r" fill="#dfe9ff" height="34" rx="9" width="18" x="142" y="120" />
-        <rect fill="#dfe9ff" height="18" rx="8" width="16" x="80" y="168" />
-        <rect fill="#dfe9ff" height="18" rx="8" width="16" x="104" y="168" />
+        <rect fill="#e7eef7" height="7" rx="3.5" width="44" x="78" y="150" />
+        <rect class="robot-arm-l" fill="#e7eef7" height="34" rx="9" width="18" x="40" y="120" />
+        <rect class="robot-arm-r" fill="#e7eef7" height="34" rx="9" width="18" x="142" y="120" />
+        <rect fill="#e7eef7" height="18" rx="8" width="16" x="80" y="168" />
+        <rect fill="#e7eef7" height="18" rx="8" width="16" x="104" y="168" />
       </svg>
     </div>
     <p class="max-w-md text-center text-sm font-medium text-ink-700" data-test="phrase">
@@ -113,10 +179,6 @@ const CHIP_TEXT = 'px-2.5 py-1 text-[11px] font-medium text-primary-700'
 <style scoped>
 .robot-float {
   animation: robot-float 3s ease-in-out infinite;
-}
-
-.robot-eyes {
-  animation: robot-scan 2.6s ease-in-out infinite;
 }
 
 .robot-antenna {
@@ -149,17 +211,6 @@ const CHIP_TEXT = 'px-2.5 py-1 text-[11px] font-medium text-primary-700'
 
   50% {
     transform: translateY(-10px);
-  }
-}
-
-@keyframes robot-scan {
-  0%,
-  100% {
-    transform: translateX(-4px);
-  }
-
-  50% {
-    transform: translateX(4px);
   }
 }
 
@@ -215,7 +266,6 @@ const CHIP_TEXT = 'px-2.5 py-1 text-[11px] font-medium text-primary-700'
 
 @media (prefers-reduced-motion: reduce) {
   .robot-float,
-  .robot-eyes,
   .robot-antenna,
   .robot-ring,
   .robot-chip,

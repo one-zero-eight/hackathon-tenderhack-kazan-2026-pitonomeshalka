@@ -45,4 +45,25 @@ describe('CorrectionsPanel', () => {
     await wrapper.find('[data-test="apply-all"]').trigger('click')
     expect(wrapper.emitted('applyAll')).toHaveLength(1)
   })
+
+  it('collapses and expands the issue list from the header toggle', async () => {
+    const wrapper = mountWithPrime(CorrectionsPanel, { props: { matches: [match()] } })
+    const toggle = () => wrapper.find('[data-test="toggle"]')
+    expect(toggle().attributes('aria-expanded')).toBe('true')
+    expect(wrapper.find('[data-test="issues"]').classes().join(' ')).toContain('grid-rows-[1fr]')
+    await toggle().trigger('click')
+    expect(toggle().attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('[data-test="issues"]').classes().join(' ')).toContain('grid-rows-[0fr]')
+    await toggle().trigger('click')
+    expect(toggle().attributes('aria-expanded')).toBe('true')
+    expect(wrapper.find('[data-test="issues"]').classes().join(' ')).toContain('grid-rows-[1fr]')
+  })
+
+  it('keeps the fix-all button working while the list is collapsed', async () => {
+    const wrapper = mountWithPrime(CorrectionsPanel, { props: { matches: [match()] } })
+    await wrapper.find('[data-test="toggle"]').trigger('click')
+    expect(wrapper.find('[data-test="apply-all"]').exists()).toBe(true)
+    await wrapper.find('[data-test="apply-all"]').trigger('click')
+    expect(wrapper.emitted('applyAll')).toHaveLength(1)
+  })
 })

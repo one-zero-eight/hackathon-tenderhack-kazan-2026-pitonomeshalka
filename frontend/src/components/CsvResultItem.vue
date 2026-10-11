@@ -12,22 +12,22 @@ defineProps<{ item: BatchItem; index: number }>()
 </script>
 
 <template>
-  <Accordion class="overflow-hidden rounded-2xl border border-ink-200 bg-white" :multiple="true">
+  <Accordion class="card-registry overflow-hidden" :multiple="true">
     <AccordionPanel :value="String(item.id)">
       <AccordionHeader>
         <span class="flex w-full min-w-0 items-center gap-3 pr-2">
-          <span class="text-xs text-ink-400 tabular-nums">{{ index + 1 }}</span>
-          <span class="truncate text-sm text-ink-900">{{ item.query }}</span>
+          <span class="font-mono text-xs text-ink-400 tabular-nums">{{ index + 1 }}</span>
+          <span class="truncate text-sm font-semibold text-ink-900">{{ item.query }}</span>
           <span class="ml-auto flex shrink-0 items-center gap-2">
             <template v-if="item.status === 'searching'">
               <ProgressSpinner style="width: 18px; height: 18px" />
-              <span class="text-xs font-medium text-primary-700">Ищу…</span>
+              <span class="text-xs font-semibold text-primary-600">Ищу…</span>
             </template>
             <StatusChip
               v-else-if="item.status === 'done' && item.result"
               :status="item.result.status"
             />
-            <span class="text-xs font-medium text-danger-700" v-else-if="item.status === 'error'">
+            <span class="text-xs font-semibold text-accent-700" v-else-if="item.status === 'error'">
               Ошибка
             </span>
             <span class="text-xs text-ink-400" v-else>В очереди</span>
@@ -51,7 +51,7 @@ defineProps<{ item: BatchItem; index: number }>()
             Исправлено: «{{ item.query }}» → «{{ item.corrected }}»
           </p>
           <AnalysisResult v-if="item.status === 'done' && item.result" :result="item.result" />
-          <p class="text-sm text-danger-700" v-if="item.status === 'error'">{{ item.error }}</p>
+          <p class="text-sm text-accent-700" v-if="item.status === 'error'">{{ item.error }}</p>
           <p class="text-sm text-ink-400" v-else-if="item.status === 'pending'">
             Ожидает очереди проверки…
           </p>

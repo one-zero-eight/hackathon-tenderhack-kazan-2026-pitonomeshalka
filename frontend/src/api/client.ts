@@ -1,4 +1,5 @@
 import type { FetchLike } from '../lib/fetch-like'
+import { normalizeAnalysis } from './normalize'
 import type { AnalysisRequest, AnalysisResponse, HealthPayload, PreviewResponse } from './types'
 
 export class ApiError extends Error {
@@ -39,7 +40,9 @@ function extractMessage(detail: unknown): string | null {
 function extractPartial(detail: unknown): AnalysisResponse | null {
   if (detail && typeof detail === 'object' && 'result' in detail) {
     const result = (detail as { result: unknown }).result
-    if (result && typeof result === 'object') return result as AnalysisResponse
+    if (result && typeof result === 'object') {
+      return normalizeAnalysis(result as AnalysisResponse)
+    }
   }
   return null
 }
@@ -70,8 +73,9 @@ export class KtruApiClient {
     this.fetchImpl = options.fetch ?? ((url, init) => fetch(url, init))
   }
 
-  analyze(request: AnalysisRequest, signal?: AbortSignal): Promise<AnalysisResponse> {
-    return this.request('analyze', request, signal)
+  async analyze(request: AnalysisRequest, signal?: AbortSignal): Promise<AnalysisResponse> {
+    const result = await this.request<AnalysisResponse>('analyze', request, signal)
+    return normalizeAnalysis(result)
   }
 
   preview(request: AnalysisRequest, signal?: AbortSignal): Promise<PreviewResponse> {

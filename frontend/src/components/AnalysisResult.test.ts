@@ -7,7 +7,7 @@ const candidate: Candidate = {
   code: '26.02.10.110-00000001',
   version: '9c8a',
   name: 'Дрели аккумуляторные',
-  status: 'supported',
+  status: 'compatible',
   reasons: ['Совпадение по описанию'],
   missing_required: ['Напряжение батареи'],
   unmatched_properties: ['Цвет: красный'],
@@ -53,5 +53,28 @@ describe('AnalysisResult', () => {
     expect(wrapper.find('[data-test="recommended"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Дрели аккумуляторные')
     expect(wrapper.text()).toContain('Нужны уточнения')
+  })
+
+  it('renders candidates whose empty arrays the backend omits from the payload', () => {
+    const sparseCandidate = {
+      code: '32.99.53.130-00000001',
+      version: '4',
+      name: 'Доска магнитно-маркерная',
+      status: 'uncertain',
+      reasons: ['Вид товара не подтверждён описанием.'],
+    } as unknown as Candidate
+    const wrapper = mountWithPrime(AnalysisResult, {
+      props: {
+        result: {
+          ...result,
+          recommended_candidate: null,
+          status: 'needs_clarification',
+          candidates: [sparseCandidate],
+        },
+      },
+    })
+    expect(wrapper.text()).toContain('Доска магнитно-маркерная')
+    expect(wrapper.text()).toContain('Вид товара не подтверждён описанием.')
+    expect(wrapper.text()).toContain('32.99.53.130-00000001')
   })
 })

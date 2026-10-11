@@ -22,14 +22,10 @@ const props = withDefaults(
 
 const MAX_LENGTH = 10000
 
-const SELECT_CLASS =
-  'rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm focus:border-primary-500'
-const TEXTAREA_CLASS =
-  'w-full resize-y rounded-xl border border-ink-300 bg-white px-4 py-3 text-[15px] ' +
-  'leading-relaxed transition placeholder:text-ink-400 focus:border-primary-500 ' +
-  'focus:ring-4 focus:ring-primary-100'
+const SELECT_CLASS = 'field-base px-3 py-2 text-sm'
+const TEXTAREA_CLASS = 'field-base w-full resize-y px-4 py-3 text-[15px] leading-relaxed transition'
 const ERROR_CARD =
-  'space-y-2 rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700'
+  'card-registry space-y-2 border-accent-200 bg-accent-50 p-4 text-sm text-accent-700'
 
 const text = ref('')
 const scope = ref<AnalysisScope>('all')
@@ -59,10 +55,10 @@ function run() {
 
 <template>
   <section class="space-y-4">
-    <div class="space-y-4 rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
-      <div class="flex flex-wrap items-baseline gap-3">
-        <h2 class="text-base font-semibold text-ink-900">Описание товара</h2>
-        <span class="ml-auto text-xs text-ink-400 tabular-nums">
+    <div class="card-registry animate-rise-in space-y-4 p-6">
+      <div class="flex flex-wrap items-baseline gap-3 border-b border-ink-200 pb-3">
+        <h2 class="eyebrow">Описание товара</h2>
+        <span class="ml-auto font-mono text-xs text-ink-400 tabular-nums">
           {{ text.length }} / {{ MAX_LENGTH }}
         </span>
       </div>
@@ -86,7 +82,7 @@ function run() {
           </select>
         </label>
         <Button
-          class="ml-auto"
+          class="btn-cta ml-auto px-6"
           :disabled="!text.trim() || searchPhase === 'searching'"
           :loading="searchPhase === 'searching'"
           @click="run"
@@ -95,8 +91,8 @@ function run() {
           size="large"
         />
       </div>
-      <p class="text-sm text-ink-500" v-if="checking">Проверяем орфографию…</p>
-      <p class="text-sm text-warning-700" v-else-if="spellError" data-test="lt-warning">
+      <p class="text-[13px] text-ink-500" v-if="checking">Проверяем орфографию…</p>
+      <p class="text-[13px] text-warning-700" v-else-if="spellError" data-test="lt-warning">
         Проверка орфографии недоступна — отправим текст как есть
       </p>
     </div>

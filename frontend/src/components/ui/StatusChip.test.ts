@@ -4,8 +4,8 @@ import StatusChip from './StatusChip.vue'
 
 describe('StatusChip', () => {
   it('labels candidate verdicts in Russian', () => {
-    const supported = mount(StatusChip, { props: { status: 'supported' } })
-    expect(supported.text()).toContain('Подтверждён')
+    const compatible = mount(StatusChip, { props: { status: 'compatible' } })
+    expect(compatible.text()).toContain('Подходит')
     const uncertain = mount(StatusChip, { props: { status: 'uncertain' } })
     expect(uncertain.text()).toContain('Требует проверки')
     const rejected = mount(StatusChip, { props: { status: 'rejected' } })
@@ -22,8 +22,8 @@ describe('StatusChip', () => {
   })
 
   it('uses color tones per verdict', () => {
-    const supported = mount(StatusChip, { props: { status: 'supported' } })
-    expect(supported.find('[data-test="chip"]').classes().join(' ')).toContain('success')
+    const compatible = mount(StatusChip, { props: { status: 'compatible' } })
+    expect(compatible.find('[data-test="chip"]').classes().join(' ')).toContain('success')
     const rejected = mount(StatusChip, { props: { status: 'rejected' } })
     expect(rejected.find('[data-test="chip"]').classes().join(' ')).toContain('danger')
   })

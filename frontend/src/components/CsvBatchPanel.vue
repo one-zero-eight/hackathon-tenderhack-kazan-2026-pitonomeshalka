@@ -45,14 +45,13 @@ const dragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const DROPZONE =
-  'flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed ' +
+  'flex cursor-pointer flex-col items-center gap-3 border-2 border-dashed ' +
   'px-6 py-10 text-center transition'
-const SELECT_CLASS =
-  'rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm focus:border-primary-500'
+const SELECT_CLASS = 'field-base px-3 py-2 text-sm'
 
 const rowsCount = computed(() => table.value?.rows.length ?? 0)
 const dropzoneTone = computed(() =>
-  dragging.value ? 'border-primary-500 bg-primary-50' : 'border-ink-300 bg-ink-50',
+  dragging.value ? 'border-primary-500 bg-primary-50' : 'border-ink-300 bg-white',
 )
 const progressPercent = computed(() =>
   batch.progress.value.total === 0
@@ -102,12 +101,9 @@ function reset() {
 
 <template>
   <section class="space-y-4">
-    <div
-      class="space-y-4 rounded-2xl border border-ink-200 bg-white p-5 shadow-sm"
-      v-if="batch.items.value.length === 0"
-    >
-      <div>
-        <h2 class="text-base font-semibold text-ink-900">Пакетная проверка из CSV</h2>
+    <div class="card-registry animate-rise-in space-y-4 p-6" v-if="batch.items.value.length === 0">
+      <div class="border-b border-ink-200 pb-3">
+        <h2 class="eyebrow">Пакетная проверка из CSV</h2>
         <p class="mt-1 text-sm text-ink-500">
           Загрузите таблицу: одна строка — одно описание товара. Результаты появляются по мере
           проверки.
@@ -129,7 +125,7 @@ function reset() {
           ref="fileInput"
           type="file"
         />
-        <svg class="h-10 w-10 text-primary-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 text-primary-500" fill="none" viewBox="0 0 24 24">
           <path
             d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
             stroke="currentColor"
@@ -138,13 +134,15 @@ function reset() {
             stroke-width="1.8"
           />
         </svg>
-        <p class="text-sm text-ink-700">Перетащите CSV-файл сюда или выберите на диске</p>
-        <p class="text-xs text-ink-400">Поддерживаются разделители «;», «,» и табуляция</p>
+        <p class="text-[15px] font-semibold text-ink-900">
+          Перетащите CSV-файл сюда или выберите на диске
+        </p>
+        <p class="text-xs text-ink-500">Поддерживаются разделители «;», «,» и табуляция</p>
         <Button @click.stop="pickFile" label="Выбрать файл" severity="secondary" size="small" />
       </div>
 
-      <div class="space-y-3 rounded-2xl border border-ink-200 bg-ink-50 p-4" v-if="table">
-        <p class="text-sm font-medium text-ink-900">{{ fileName }} — строк: {{ rowsCount }}</p>
+      <div class="card-registry space-y-3 bg-primary-50 p-4" v-if="table">
+        <p class="text-sm font-semibold text-ink-900">{{ fileName }} — строк: {{ rowsCount }}</p>
         <label class="flex items-center gap-2 text-sm text-ink-500">
           Столбец с описанием
           <select v-model.number="queryColumn" :class="SELECT_CLASS" data-test="column">
@@ -153,7 +151,7 @@ function reset() {
             </option>
           </select>
         </label>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto bg-white">
           <table class="w-full text-xs">
             <tbody>
               <tr
@@ -162,7 +160,7 @@ function reset() {
                 :key="index"
               >
                 <td
-                  class="max-w-64 truncate py-1.5 pr-3 text-ink-700"
+                  class="max-w-64 truncate py-1.5 pr-3 font-mono text-ink-700"
                   v-for="(cell, cellIndex) in row"
                   :key="cellIndex"
                 >
@@ -182,12 +180,16 @@ function reset() {
     </div>
 
     <template v-else>
-      <div class="space-y-3 rounded-2xl border border-ink-200 bg-white p-5 shadow-sm">
-        <div class="flex flex-wrap items-center gap-3">
-          <p class="text-sm font-medium text-ink-900">
+      <div class="card-registry animate-rise-in space-y-3 p-6">
+        <div class="flex flex-wrap items-center gap-3 border-b border-ink-200 pb-3">
+          <h2 class="eyebrow">
             Проверено {{ batch.progress.value.done }} из {{ batch.progress.value.total }}
-          </p>
-          <span class="text-xs text-warning-700" v-if="ltFailed" data-test="lt-warning">
+          </h2>
+          <span
+            class="text-xs font-semibold text-warning-700"
+            v-if="ltFailed"
+            data-test="lt-warning"
+          >
             Сервис орфографии недоступен — строки отправлены как есть
           </span>
           <Button
