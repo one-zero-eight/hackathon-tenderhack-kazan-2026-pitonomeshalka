@@ -56,8 +56,15 @@ class EmbeddingRetriever:
             import_id, text, vector, fingerprint, scope, top_k)
         families = self.store.get_family_splits(import_id, positions, scope)
         by_parent = {(family["code"], family["version"]): family for family in families}
-        codes = [position.code for position in positions]
+        # Reserve family alternatives in ranked order before lower-ranked hits
+        # consume every slot. A full initial shortlist must not block expansion.
+        codes = []
         for position in positions:
+            if position.code in codes:
+                continue
+            if len(codes) == top_k:
+                break
+            codes.append(position.code)
             family = by_parent.get((position.parent_code, position.parent_version))
             siblings = [child["code"] for child in family["children"]] if family else []
             additions = [code for code in siblings if code not in codes]
