@@ -297,6 +297,12 @@ class PostgresStore:
         self._write("INSERT INTO run_artifacts(run_id,name,payload) VALUES (%s,%s,%s) "
                     "ON CONFLICT(run_id,name) DO UPDATE SET payload=EXCLUDED.payload", (run_id, name, Jsonb(payload)))
 
+    def get_artifact(self, run_id, name):
+        with self.engine.connect() as connection:
+            row = connection.exec_driver_sql("SELECT payload FROM run_artifacts WHERE run_id=%s AND name=%s",
+                                             (run_id, name)).mappings().first()
+            return row["payload"] if row else None
+
     def start_model_call(self, run_id, ordinal, outgoing):
         self._write("INSERT INTO model_calls(run_id,ordinal,requested_at,status,request_id,experiment,method,url,request,outgoing) "
                     "VALUES (%s,%s,%s,'running',%s,%s,%s,%s,%s,%s)",
