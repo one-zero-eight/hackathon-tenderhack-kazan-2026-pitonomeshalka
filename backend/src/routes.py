@@ -9,9 +9,12 @@ from backend.src.schemas import (
     AnalysisResponse,
     ErrorResponse,
     HealthResponse,
+    HistoryAddRequest,
+    HistoryResponse,
     ModelHealthResponse,
     PreviewResponse,
 )
+from backend.src.history import SearchHistoryStore
 from backend.src.service import PipelineService
 
 router = APIRouter()
@@ -35,6 +38,13 @@ def get_pipeline_service(request: Request) -> PipelineService:
 
 
 PipelineDependency = Annotated[PipelineService, Depends(get_pipeline_service)]
+
+
+def get_history_store(request: Request) -> SearchHistoryStore:
+    return request.app.state.history
+
+
+HistoryDependency = Annotated[SearchHistoryStore, Depends(get_history_store)]
 
 
 @router.get("/health", tags=["Health"], summary="Check backend availability and classifier activity")
@@ -215,3 +225,40 @@ def saved_result(
     if run is None or run["result"] is None:
         raise HTTPException(404, detail={"error": "Run is unknown or its result is not saved yet"})
     return AnalysisResponse.model_validate(run["result"])
+
+
+@router.post(
+    "/history", tags=["History"], summary="Save a search query to session history",
+)
+def add_history(
+    body: HistoryAddRequest,
+    history: HistoryDependency,
+) -> None:
+    """Store a search query under the given session ID.
+
+    The query is prepended to the session's list (newest first), duplicates are
+    removed, and the list is trimmed to the configured maximum (default 5).
+    Keys expire after the configured TTL (default 7 days).
+
+    Returns 200 on success even when Redis is unavailable — history is
+    best-effort. No content body.
+    """
+    history.add(body.session_id, body.query)
+
+
+@router.get(
+    "/history/{session_id}", tags=["History"], summary="Get recent search queries for a session",
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid session ID format."},
+    },
+)
+def get_history(
+    session_id: Annotated[str, Path(min_length=1, max_length=64)],
+    history: HistoryDependency,
+) -> HistoryResponse:
+    """Return the most recent queries for a session, newest first.
+
+    Returns an empty list when the session has no history or Redis is
+    unavailable. Session IDs must match `[A-Za-z0-9_-]{1,64}`.
+    """
+    return HistoryResponse(queries=history.get(session_id))

@@ -125,3 +125,13 @@ class HealthResponse(BaseModel):
 class ModelHealthResponse(BaseModel):
     status: Literal["ok"]
     model: str
+
+
+class HistoryAddRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    session_id: str = Field(min_length=1, max_length=64)
+    query: str = Field(min_length=1, max_length=500)
+
+
+class HistoryResponse(BaseModel):
+    queries: list[str]
